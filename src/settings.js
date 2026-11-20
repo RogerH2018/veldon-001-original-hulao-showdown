@@ -1,5 +1,5 @@
-import { ACTIONS, DEFAULT_BINDINGS, DEFAULT_MACROS, compileCombo, keyName, normalizeKey } from './input.js';
-import { FIGHTERS } from './fight.js';
+import { ACTIONS, DEFAULT_BINDINGS, DEFAULT_MACROS, compileCombo, keyName, normalizeKey } from './input.js?v=2';
+import { DEFAULT_ROSTER, findFighter } from './roster.js';
 
 const $ = selector => document.querySelector(selector);
 const storageKey = 'veldon.arc-harbor.v1';
@@ -7,6 +7,7 @@ const reserved = new Set(['Escape', 'Enter', 'Tab', 'MetaLeft', 'MetaRight', 'Al
 export const labels = { up: '上', left: '左', down: '下', right: '右', A: '轻击', B: '进击', C: '破防', D: '脉冲' };
 const defaults = () => ({
   mode: 'cpu', difficulty: 2, sound: true,
+  roster: [...DEFAULT_ROSTER],
   bindings: structuredClone(DEFAULT_BINDINGS), macros: structuredClone(DEFAULT_MACROS),
 });
 
@@ -15,6 +16,7 @@ export function validateSettings(config) {
     throw new Error('对战设置无效');
   }
   if (config.bindings.length !== 2 || config.macros.length !== 2) throw new Error('需要两位玩家的设置');
+  if (config.roster.length !== 2 || !config.roster.every(findFighter)) throw new Error('对战角色无效');
   const used = new Set();
   const bind = (key, id) => {
     if (typeof key !== 'string' || !key || reserved.has(key) || used.has(key)) {
@@ -27,6 +29,7 @@ export function validateSettings(config) {
     if (config.macros[player].length !== 3) throw new Error('每位玩家需要三个连招槽');
     config.macros[player].forEach((macro, slot) => {
       bind(macro.key, player + 1);
+      if (!['signature', 'custom'].includes(macro.source)) throw new Error('连招来源无效');
       if (typeof macro.name !== 'string' || macro.name.trim().length < 1 || macro.name.length > 20) {
         throw new Error((player + 1) + 'P 连招 ' + (slot + 1) + ' 的名称须为 1 至 20 字');
       }
@@ -38,12 +41,23 @@ export function validateSettings(config) {
 
 export function loadSettings() {
   try {
-    const saved = JSON.parse(localStorage.getItem(storageKey));
+    const saved = migrateSettings(JSON.parse(localStorage.getItem(storageKey)));
     validateSettings(saved);
     return saved;
   } catch {
     return defaults();
   }
+}
+
+export function migrateSettings(saved) {
+  if (!saved) return defaults();
+  saved.roster = DEFAULT_ROSTER.map((id, player) => findFighter(saved.roster?.[player])?.id ?? id);
+  saved.macros.forEach((slots, player) => slots.forEach((slot, index) => {
+    if (slot.source !== undefined) return;
+    const previous = DEFAULT_MACROS[player][index];
+    slot.source = ['name', 'sequence', 'gap'].some(field => slot[field] !== previous[field]) ? 'custom' : 'signature';
+  }));
+  return saved;
 }
 
 export function saveSettings(settings) {
@@ -78,14 +92,17 @@ export function setupSettings(dialog, callbacks) {
   }
 
   function renderForm() {
-    $('#settings-tabs').innerHTML = FIGHTERS.map((fighter, index) => '<button type="button" data-tab="' + index + '">'
+    const fighters = draft.roster.map(findFighter);
+    $('#settings-tabs').innerHTML = fighters.map((fighter, index) => '<button type="button" data-tab="' + index + '">'
       + (index + 1) + 'P ' + fighter.name + '</button>').join('');
-    $('#settings-players').innerHTML = FIGHTERS.map((fighter, index) => '<section class="settings-pane" data-pane="' + index
+    $('#settings-players').innerHTML = fighters.map((fighter, index) => '<section class="settings-pane" data-pane="' + index
       + '"><h3>方向与攻击</h3><div class="binding-grid">'
       + ACTIONS.map(action => '<label>' + labels[action] + ' <button type="button" data-field="binding" data-value="' + action + '"></button></label>').join('')
-      + '</div><h3>快捷连招</h3><p class="hint">方向随角色朝向。A W8 236A 表示轻击、等待 8 帧，再冲刺。</p>'
+      + '</div><h3>快捷连招</h3><p class="hint">默认使用专属技。切换到自定义时可编辑指令。A W8 236A 表示轻击、等待 8 帧，再冲刺。</p>'
       + draft.macros[index].map((slot, i) => '<div class="macro-row"><label>快捷键 <button type="button" data-field="key" data-value="' + i
-        + '"></button></label><label>名称 <input maxlength="20" data-slot="' + i + '" data-prop="name"></label><label>指令 <input maxlength="160" data-slot="'
+        + '"></button></label><label>招式来源 <select data-slot="' + i + '" data-prop="source"><option value="signature">'
+        + fighter.signatures[i].name + '</option><option value="custom">自定义</option></select></label>'
+        + '<label>名称 <input maxlength="20" data-slot="' + i + '" data-prop="name"></label><label>指令 <input maxlength="160" data-slot="'
         + i + '" data-prop="sequence"></label><label>间隔帧 <input type="number" min="6" max="30" data-slot="' + i
         + '" data-prop="gap"></label></div>').join('') + '</section>').join('');
     dialog.querySelectorAll('[data-pane]').forEach(pane => {
@@ -104,6 +121,16 @@ export function setupSettings(dialog, callbacks) {
         const { slot, prop } = input.dataset;
         input.value = draft.macros[player][slot][prop];
         input.oninput = () => { draft.macros[player][slot][prop] = prop === 'gap' ? Number(input.value) : input.value; };
+      });
+      pane.querySelectorAll('select[data-prop="source"]').forEach(select => {
+        const { slot } = select.dataset;
+        select.value = draft.macros[player][slot].source;
+        const updateSource = () => {
+          draft.macros[player][slot].source = select.value;
+          select.closest('.macro-row').querySelectorAll('input').forEach(input => { input.disabled = select.value === 'signature'; });
+        };
+        select.onchange = updateSource;
+        updateSource();
       });
     });
     dialog.querySelectorAll('[data-tab]').forEach(button => {

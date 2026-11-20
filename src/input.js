@@ -8,7 +8,7 @@ export const DEFAULT_BINDINGS = [
 export const DEFAULT_MACROS = [
   ['KeyL', 'KeyO', 'KeyP'], ['Digit3', 'Digit6', 'Digit9'],
 ].map(keys => keys.map((key, index) => ({
-  key, name: ['迎潮', '回流', '放电'][index],
+  key, source: 'signature', name: ['迎潮', '回流', '放电'][index],
   sequence: ['A W8 236A', '214B', '236D'][index], gap: 16,
 })));
 

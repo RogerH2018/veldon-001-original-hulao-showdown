@@ -1,4 +1,6 @@
-import { FIGHTERS, GROUND, HEIGHT, MOVES, WIDTH } from './fight.js';
+import { GROUND, HEIGHT, MOVES, WIDTH } from './fight.js?v=2';
+import { drawFighter } from './fighter-render.js';
+import { drawStrike } from './strike-render.js';
 
 const tau = Math.PI * 2;
 
@@ -127,95 +129,18 @@ function drawCrane(ctx, x, y, scale) {
   ctx.restore();
 }
 
-function drawFighter(ctx, fighter, frame, showpiece) {
-  const char = FIGHTERS[fighter.id];
-  const anchor = fighter.id === 0;
-  const x = showpiece ? (anchor ? 264 : 936) : fighter.x;
-  const y = GROUND - fighter.y;
-  const direction = fighter.facing;
-  const move = fighter.move;
-  const strike = move ? Math.sin(Math.PI * Math.min(1, move.age / MOVES[move.id].end)) : 0;
-  const low = fighter.pose === 'guard';
-  const hurt = fighter.pose === 'hurt';
-  const gait = fighter.pose === 'walk' ? Math.sin(frame * 0.23) * 14 : 0;
-  const breath = Math.sin(frame * 0.079 + fighter.id * 1.6) * 3;
-  const tall = anchor ? 1 : 1.1;
-  const arm = move ? (move.id === 'C' ? 88 : move.id === 'D' ? 78 : 64) * strike : 0;
-  const scale = showpiece ? 1.23 : 1.06;
-  const color = fighter.flash > 4 ? '#fefff7' : char.color;
-  const shoulder = anchor ? 39 : 28;
-  const reactor = anchor ? 12 : 7;
-
-  ellipse(ctx, x, GROUND + 5, 56 * scale, 10, '#051017a0');
-  ellipse(ctx, x, GROUND + 6, 36 * scale, 5, char.color + '24');
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(direction * scale, scale);
-  ctx.rotate(hurt ? -0.18 : move ? strike * 0.11 : 0);
-  const hip = -68 + (low ? 18 : 0) + breath * 0.45;
-  const chest = -131 * tall + (low ? 21 : 0) + breath;
-
-  line(ctx, [[-17, hip + 5], [-32 + gait, -26], [-35 + gait, -6]], '#101c2a', anchor ? 26 : 17);
-  line(ctx, [[18, hip + 5], [27 - gait, -28], [36 - gait, -5]], char.shadow, anchor ? 31 : 18);
-  poly(ctx, [[14 - gait, -40], [32 - gait, -38], [40 - gait, -14], [22 - gait, -12]], char.suit);
-  poly(ctx, [[18 - gait, -10], [37 - gait, -14], [50 - gait, -7], [50 - gait, 1], [15 - gait, 1]], color);
-  poly(ctx, [[-42 + gait, -12], [-24 + gait, -10], [-20 + gait, 0], [-53 + gait, 0], [-53 + gait, -7]], char.shadow);
-
-  if (anchor) {
-    poly(ctx, [[-48, chest - 20], [-20, chest - 33], [-9, chest + 23], [-49, chest + 17]], '#172933');
-    line(ctx, [[-44, chest - 13], [-27, chest - 20], [-22, chest + 7]], '#f3ac592e', 3);
-  } else {
-    const sweep = Math.sin(frame * 0.12) * 10;
-    poly(ctx, [[-20, chest - 13], [-46, chest - 2], [-85 - strike * 15, chest + 16 + sweep], [-54, chest + 24], [-20, chest + 8]], '#2bd3bf9c');
-    line(ctx, [[-21, chest - 10], [-51, chest + 5], [-79 - strike * 15, chest + 18 + sweep]], '#a9fcdd', 2);
-  }
-  poly(ctx, [[-shoulder, chest - 6], [-21, chest - 27], [23, chest - 25], [shoulder + 7, chest], [21, hip + 10], [-21, hip + 10]], '#0d1823');
-  poly(ctx, [[-shoulder + 7, chest - 4], [-19, chest - 19], [24, chest - 17], [shoulder, chest + 2], [17, hip], [-16, hip]], char.suit);
-  poly(ctx, [[-shoulder + 9, chest], [-12, chest - 16], [25, chest - 13], [shoulder - 1, chest + 3], [17, chest + 21], [-17, chest + 17]], char.shadow);
-  poly(ctx, [[-reactor, chest + 5], [0, chest - 6], [reactor, chest + 5], [0, chest + 14]], color);
-  line(ctx, [[-17, hip - 5], [20, hip - 5]], color, 3);
-
-  const head = chest - (anchor ? 42 : 47);
-  if (anchor) {
-    poly(ctx, [[-27, head + 13], [-29, head - 10], [-18, head - 23], [15, head - 24], [27, head - 8], [25, head + 15], [5, head + 24], [-13, head + 22]], '#121c24');
-    poly(ctx, [[-27, head - 8], [-17, head - 22], [14, head - 22], [26, head - 9], [16, head - 4], [-16, head - 4]], color);
-    poly(ctx, [[-20, head + 2], [23, head - 4], [19, head + 9], [-11, head + 12]], '#552d26');
-    line(ctx, [[-11, head + 5], [17, head + 2]], '#ffe5a7', 4);
-  } else {
-    poly(ctx, [[-24, head + 9], [-18, head - 21], [-4, head - 24], [21, head - 14], [29, head + 1], [12, head + 18], [-4, head + 23]], '#101c2b');
-    poly(ctx, [[-24, head + 7], [-20, head - 6], [-34, head - 30], [-8, head - 22], [13, head - 16], [26, head - 6], [13, head - 1]], color);
-    poly(ctx, [[-11, head + 4], [27, head - 2], [17, head + 8], [-6, head + 12]], '#e4ffee');
-  }
-
-  const fistX = low ? 30 : 43 + arm;
-  const fistY = low ? chest - 19 : chest + 17 - strike * (move?.id === 'C' ? 28 : 11);
-  line(ctx, [[-shoulder + 5, chest + 2], [-44, chest + 26], [-34, chest + 47]], char.shadow, anchor ? 19 : 13);
-  line(ctx, [[shoulder - 4, chest + 3], [35 + arm * 0.62, chest + 22], [fistX, fistY]], '#111e29', anchor ? 25 : 17);
-  poly(ctx, [[fistX - 12, fistY - 12], [fistX + 13, fistY - 14], [fistX + 21, fistY - 3], [fistX + 14, fistY + 12], [fistX - 12, fistY + 11]], color);
-  line(ctx, [[fistX - 2, fistY - 4], [fistX + 13, fistY - 6]], '#fff7db98', 2);
-
-  if (low) {
-    ctx.strokeStyle = char.color + '99';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.ellipse(28, -78, 56, 74, 0, -1.27, 1.02);
-    ctx.stroke();
-  }
-  if (strike > 0.66) {
-    ctx.strokeStyle = char.color + 'b6';
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.ellipse(39, chest + 6, 81, 63, -0.23, -0.54, 0.73);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
 export function createRenderer(canvas) {
   const ctx = canvas.getContext('2d');
   const background = makeBackdrop();
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
   return (fight, frame) => {
     ctx.drawImage(background, 0, 0);
+    const heavyImpact = fight.effects.find(effect => effect.last && effect.type !== 'strike' && fight.frame - effect.frame <= 7);
+    ctx.save();
+    if (heavyImpact && !reduceMotion.matches) {
+      const strength = (8 - (fight.frame - heavyImpact.frame)) * 0.65;
+      ctx.translate(Math.sin(frame * 1.7) * strength, Math.cos(frame * 2.8) * strength * 0.45);
+    }
     for (let i = 0; i < 33; i++) {
       const x = (i * 127 + frame * (0.23 + i % 3 * 0.13)) % WIDTH;
       const y = 190 + i * 67 % 296 + Math.sin(frame * 0.03 + i) * 8;
@@ -223,24 +148,30 @@ export function createRenderer(canvas) {
     }
     for (const projectile of fight.projectiles) {
       const y = GROUND - projectile.y;
-      const color = FIGHTERS[projectile.id].color;
+      const color = fight.fighters[projectile.id].character.color;
       ellipse(ctx, projectile.x, y, 32, 14, color + '30');
       ellipse(ctx, projectile.x, y, 22, 7, color);
       line(ctx, [[projectile.x, y - 1], [projectile.x - projectile.facing * 65, y - 1]], color + '9a', 4);
     }
-    for (const fighter of fight.fighters) drawFighter(ctx, fighter, frame, fight.phase === 'lobby');
+    for (const fighter of fight.fighters) drawFighter(ctx, fighter, frame, { ground: GROUND, lobby: fight.phase === 'lobby' }, MOVES);
     for (const effect of fight.effects) {
       const age = (fight.frame - effect.frame) / effect.duration;
-      const color = effect.blocked ? '#b8fff2' : FIGHTERS[effect.id].color;
+      if (effect.type === 'strike') {
+        drawStrike(ctx, effect, age);
+        continue;
+      }
+      const color = effect.blocked ? '#b8fff2' : effect.color;
       ctx.save();
       ctx.globalAlpha = (1 - age) ** 1.6;
       ctx.translate(effect.x, effect.y);
-      for (let i = 0; i < 10; i++) {
-        ctx.rotate(tau / 10);
-        const radius = 12 + age * 76;
+      const rays = effect.last ? 16 : 10;
+      for (let i = 0; i < rays; i++) {
+        ctx.rotate(tau / rays);
+        const radius = 8 + age * (effect.last ? 119 : 76);
         line(ctx, [[radius / 2, 0], [radius + i * 2, 1]], i % 3 ? color : '#fff8da', 2 + i % 3);
       }
       ctx.restore();
     }
+    ctx.restore();
   };
 }

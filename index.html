@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="弧港对决，Veldon Game 原创格斗游戏。">
+  <meta name="description" content="弧港对决，100 名原创角色和 300 套专属连招的网页格斗游戏。">
   <title>弧港对决 · Veldon Game</title>
-  <link rel="stylesheet" href="./src/style.css">
-  <script type="module" src="./src/main.js"></script>
+  <link rel="stylesheet" href="./src/style.css?v=2">
+  <script type="module" src="./src/main.js?v=2"></script>
 </head>
 <body>
   <header class="top">
@@ -28,7 +28,12 @@
             <button id="local-mode" type="button" aria-pressed="false">双人同屏</button>
           </div>
           <label class="difficulty" id="difficulty-control">电脑难度 <select id="difficulty"><option value="1">入门</option><option value="2">标准</option><option value="3">进阶</option></select></label>
+          <div class="pick-slots" aria-label="选择对战双方">
+            <button id="picked-0" type="button" data-pick="0">选择 1P</button>
+            <button id="picked-1" type="button" data-pick="1">选择对手</button>
+          </div>
           <button class="primary" id="start" type="button">开始对战 <kbd>Enter</kbd></button>
+          <p id="load-error" class="load-error" role="status" hidden>角色美术加载失败，请刷新后重试。</p>
         </section>
         <div class="announcement" id="announcement" aria-hidden="true" hidden></div>
         <div class="overlay" id="overlay" hidden>
@@ -43,12 +48,29 @@
       <div class="control-decks" id="decks" aria-label="键位速查"></div>
       <details class="guide">
         <summary>出招与防御</summary>
-        <p>朝后走或下蹲可以防御，C 可以破防。两胜赢得整场。橙色的棱锚近身攻击更重，薄荷色的流梭移动更快。</p>
+        <p>朝后走或下蹲可以防御，C 可以破防。两胜赢得整场。每位角色都有三套专属连招，首击命中后才会接续。默认快捷键为 1P 的 L、O、P 和 2P 的 3、6、9。</p>
         <p>面向对手输入 <kbd>236A</kbd> 冲刺，<kbd>214B</kbd> 后撤反击，<kbd>236D</kbd> 消耗 40 能量发射脉冲。数字方向以小键盘为准，6 为前，4 为后。</p>
       </details>
     </section>
     <p id="status" role="status" class="visually-hidden"></p>
   </main>
+  <dialog id="roster-dialog" class="roster-dialog" aria-labelledby="roster-title">
+    <header class="dialog-head"><div><h2 id="roster-title">选择角色</h2><span id="roster-count"></span></div><button id="roster-close" type="button">关闭</button></header>
+    <div class="roster-toolbar">
+      <div id="roster-sides" role="group" aria-label="选择对战一方"><button type="button" data-side="0">1P</button><button type="button" data-side="1">2P / CPU</button></div>
+      <label>队伍 <select id="roster-team"></select></label>
+      <label class="roster-search">搜索 <input type="search" id="roster-search" placeholder="角色名或英文代号"></label>
+    </div>
+    <div class="roster-layout">
+      <div class="roster-list" id="roster-list" aria-label="角色名单"></div>
+      <aside class="roster-preview" id="roster-preview" aria-label="角色和连招">
+        <canvas id="roster-portrait" width="270" height="300" aria-hidden="true"></canvas>
+        <div class="roster-identity"><h3 id="roster-name"></h3><p id="roster-style"></p></div>
+        <ol id="roster-skills"></ol>
+        <button class="primary" id="roster-confirm" type="button">确认角色</button>
+      </aside>
+    </div>
+  </dialog>
   <dialog id="preferences" aria-labelledby="settings-title">
     <form id="settings-form" novalidate>
       <header class="dialog-head"><h2 id="settings-title">连招 / 按键设置</h2><button id="close-settings" type="button">关闭</button></header>

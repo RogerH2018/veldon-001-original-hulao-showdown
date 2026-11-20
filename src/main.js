@@ -1,13 +1,18 @@
-import { Fight, FIGHTERS, Opponent, ROUND_SECONDS, TICKS } from './fight.js';
-import { ACTIONS, MacroPlayer, PORT, keyName, normalizeKey } from './input.js';
-import { createRenderer } from './render.js';
-import { FightSound } from './sound.js';
-import { loadSettings, saveSettings, setupSettings, labels } from './settings.js';
+import { Fight, Opponent, ROUND_SECONDS, TICKS } from './fight.js?v=2';
+import { ACTIONS, MacroPlayer, PORT, keyName, normalizeKey } from './input.js?v=2';
+import { createRenderer } from './render.js?v=2';
+import { FightSound } from './sound.js?v=2';
+import { loadSettings, saveSettings, setupSettings, labels } from './settings.js?v=2';
+import { preloadFighter } from './art.js';
+import { setupRosterPicker } from './picker.js';
 
 const $ = selector => document.querySelector(selector);
 const dialog = $('#preferences');
+const rosterDialog = $('#roster-dialog');
 let settings = loadSettings();
 let paused = false;
+let loading = false;
+let opening = 0;
 const held = new Set();
 const tapped = new Set();
 const pointers = new Map();
@@ -18,15 +23,15 @@ const arrows = { up: '↑', left: '←', down: '↓', right: '→' };
 
 const status = message => { $('#status').textContent = message; };
 const fight = new Fight((event, id) => {
-  audio.play(event);
+  audio.play(event, id);
   if (event === 'hit') macros[id].cancel();
   if (event === 'round' || event === 'roundEnd') resetInputs();
   if (event === 'fight') {
     renderTouch();
     status('开始对战');
   }
-  if (event === 'match') status(FIGHTERS[id].name + '获胜');
-});
+  if (event === 'match') status(fight.selection[id].name + '获胜');
+}, settings.roster);
 const render = createRenderer($('#arena'));
 const playerCount = () => settings.mode === 'local' ? 2 : 1;
 
@@ -39,6 +44,7 @@ function resetInputs() {
   tapped.clear();
   pointers.clear();
   macros.forEach(macro => macro.cancel());
+  fight.fighters.forEach(fighter => { fighter.pending = null; });
   document.querySelectorAll('.touch button.active').forEach(button => button.classList.remove('active'));
 }
 
@@ -54,28 +60,33 @@ function refresh() {
   $('#difficulty').value = settings.difficulty;
   $('#difficulty-control').hidden = settings.mode === 'local';
   $('#mode-status').textContent = settings.mode === 'cpu' ? '单人对战' : '双人同屏';
+  $('#picked-0').textContent = '1P · ' + fight.selection[0].name;
+  $('#picked-1').textContent = (settings.mode === 'cpu' ? 'CPU · ' : '2P · ') + fight.selection[1].name;
+  $('#start').disabled = loading;
+  $('#start').innerHTML = loading ? '正在准备角色…' : '开始对战 <kbd>Enter</kbd>';
   $('#opponent-label').textContent = settings.mode === 'cpu' ? 'CPU' : '2P';
   $('#sound').setAttribute('aria-pressed', settings.sound);
   $('#sound').textContent = settings.sound ? '声音开启' : '声音关闭';
   $('#pause').disabled = inLobby || finished;
   $('#pause').textContent = paused ? '继续 · Esc' : '暂停 · Esc';
   $('#overlay').hidden = dialog.open || (!paused && !finished);
-  $('#overlay-title').textContent = paused ? '对战暂停' : finished ? FIGHTERS[fight.roundWinner].name + '获胜' : '';
+  $('#overlay-title').textContent = paused ? '对战暂停' : finished ? fight.selection[fight.roundWinner].name + '获胜' : '';
   $('#overlay-detail').textContent = finished ? fight.fighters.map(fighter => fighter.wins).join(' : ') + ' · 对战结束' : '';
   $('#continue').textContent = paused ? '继续对战' : '再战一场';
   audio.enabled = settings.sound;
+  document.querySelectorAll('.skill-trigger').forEach(button => { button.disabled = phase !== 'fight' || paused || dialog.open; });
 }
 
 function updateDecks() {
-  $('#decks').innerHTML = FIGHTERS.map((fighter, index) => {
+  $('#decks').innerHTML = fight.selection.map((fighter, index) => {
     const auto = index === 1 && settings.mode === 'cpu';
     const group = actions => actions.map(action => '<span title="' + labels[action] + '"><kbd></kbd><small>'
       + (arrows[action] ?? action) + '</small></span>').join('');
-    return '<article class="deck deck-' + index + '" data-deck="' + index + '"><div class="deck-title"><b>'
+    return '<article class="deck deck-' + index + '" style="--accent:' + fighter.color + '" data-deck="' + index + '"><div class="deck-title"><b>'
       + (auto ? 'CPU' : (index + 1) + 'P') + '</b><strong>' + fighter.name + '</strong><span>' + fighter.style + '</span></div>'
       + (auto ? '<p class="cpu-note">电脑难度 · ' + ['入门', '标准', '进阶'][settings.difficulty - 1] + '</p>'
         : '<div class="deck-keys"><div>' + group(ACTIONS.slice(0, 4)) + '</div><div>' + group(ACTIONS.slice(4))
-        + '</div></div><div class="deck-macros"></div>') + '</article>';
+        + '</div></div>') + '<div class="deck-macros" aria-label="专属连招"></div></article>';
   }).join('');
   document.querySelectorAll('[data-deck]').forEach(deck => {
     const index = Number(deck.dataset.deck);
@@ -83,30 +94,72 @@ function updateDecks() {
       key.textContent = keyName(settings.bindings[index][ACTIONS[position]]);
     });
     const container = deck.querySelector('.deck-macros');
-    if (container) settings.macros[index].forEach(macro => {
-      const label = document.createElement('span');
+    fight.selection[index].signatures.forEach((skill, slot) => {
+      const auto = index >= playerCount();
+      const macro = settings.macros[index][slot];
+      const label = document.createElement(auto ? 'span' : 'button');
+      const key = document.createElement('kbd');
+      const detail = document.createElement('small');
+      detail.textContent = skill.steps.length + ' 段' + (skill.cost ? ' · ' + skill.cost + ' 能量' : '');
+      if (!auto) {
+        label.type = 'button';
+        label.className = 'skill-trigger';
+        label.dataset.signature = slot;
+        label.disabled = fight.phase !== 'fight' || paused;
+        if (macro.source === 'signature') {
+          key.textContent = keyName(macro.key);
+          label.append(key, ' ');
+        }
+      }
+      label.append(skill.name, detail);
+      container.append(label);
+    });
+    if (index < playerCount()) settings.macros[index].filter(macro => macro.source === 'custom').forEach(macro => {
+      const tag = document.createElement('span');
       const key = document.createElement('kbd');
       key.textContent = keyName(macro.key);
-      label.append(key, ' ' + macro.name);
-      container.append(label);
+      tag.append(key, ' ' + macro.name);
+      container.append(tag);
     });
   });
 }
 
 function renderTouch() {
-  $('#touch').innerHTML = FIGHTERS.slice(0, playerCount()).map((fighter, index) => {
+  $('#touch').innerHTML = fight.selection.slice(0, playerCount()).map((fighter, index) => {
     const buttons = actions => actions.map(action => '<button type="button" aria-label="' + fighter.name + ' ' + labels[action]
       + '" data-player="' + index + '" data-action="' + action + '">' + (arrows[action] ?? action) + '</button>').join('');
-    const shortcuts = settings.macros[index].map((slot, i) => '<button type="button" data-player="' + index
-      + '" data-macro="' + i + '">连招 ' + (i + 1) + '</button>').join('');
+    const shortcuts = fighter.signatures.map((skill, i) => '<button type="button" data-player="' + index
+      + '" data-macro="' + i + '">' + skill.name + '</button>').join('');
+    const custom = settings.macros[index].map((macro, i) => macro.source === 'custom' ? '<button type="button" data-player="'
+      + index + '" data-custom="' + i + '"></button>' : '').join('');
     return '<div class="touch-deck deck-' + index + '"><b>' + (index + 1) + 'P</b><div class="pad">' + buttons(ACTIONS.slice(0, 4))
-      + '</div><div class="pad">' + buttons(ACTIONS.slice(4)) + '</div><div class="touch-macros">' + shortcuts + '</div></div>';
+      + '</div><div class="pad">' + buttons(ACTIONS.slice(4)) + '</div><div class="touch-macros">' + shortcuts + custom + '</div></div>';
   }).join('');
+  document.querySelectorAll('#touch button[data-custom]').forEach(button => {
+    const { player, custom } = button.dataset;
+    button.textContent = settings.macros[player][custom].name;
+  });
 }
 
-function start() {
-  paused = false;
+async function start() {
+  if (loading) return;
+  const request = ++opening;
+  loading = true;
+  $('#load-error').hidden = true;
+  refresh();
   audio.unlock();
+  try {
+    await Promise.all(fight.selection.map(preloadFighter));
+  } catch {
+    $('#load-error').hidden = false;
+    status('角色美术加载失败，请刷新后重试。');
+    return;
+  } finally {
+    loading = false;
+    refresh();
+  }
+  if (request !== opening || rosterDialog.open) return;
+  paused = false;
   cpu.reset();
   fight.start();
   refresh();
@@ -115,13 +168,7 @@ function start() {
 
 function returnToLobby() {
   resetInputs();
-  const initial = new Fight();
-  fight.phase = initial.phase;
-  fight.fighters = initial.fighters;
-  fight.effects = initial.effects;
-  fight.projectiles = initial.projectiles;
-  fight.round = initial.round;
-  fight.clock = initial.clock;
+  fight.lobby(settings.roster);
   paused = false;
   refresh();
   updateHud();
@@ -138,7 +185,7 @@ function togglePause() {
 }
 
 window.addEventListener('keydown', event => {
-  if (dialog.open || event.target.closest?.('input, textarea, select')) return;
+  if (dialog.open || rosterDialog.open || event.target.closest?.('input, textarea, select')) return;
   if (event.code === 'Escape' && !event.repeat && fight.phase !== 'lobby') {
     event.preventDefault();
     togglePause();
@@ -151,13 +198,17 @@ window.addEventListener('keydown', event => {
   const key = normalizeKey(event);
   for (let player = 0; player < playerCount(); player++) {
     const action = ACTIONS.find(value => settings.bindings[player][value] === key);
-    const macro = settings.macros[player].find(slot => slot.key === key);
-    if (!action && !macro) continue;
+    const slot = settings.macros[player].findIndex(value => value.key === key);
+    if (!action && slot < 0) continue;
     event.preventDefault();
     held.add(key);
     if (!event.repeat) {
       tapped.add(key);
-      if (macro) macros[player].start(macro, fight.fighters[player].facing);
+      if (slot >= 0) {
+        const macro = settings.macros[player][slot];
+        if (macro.source === 'signature') triggerSignature(player, slot);
+        else macros[player].start(macro, fight.fighters[player].facing);
+      }
     }
   }
 });
@@ -169,18 +220,25 @@ document.addEventListener('visibilitychange', () => {
 
 $('#touch').addEventListener('pointerdown', event => {
   const button = event.target.closest('button[data-player]');
-  if (!button || fight.phase !== 'fight' || paused) return;
+  if (!button?.dataset.action || fight.phase !== 'fight' || paused) return;
   event.preventDefault();
   const player = Number(button.dataset.player);
-  if (button.dataset.macro !== undefined) {
-    macros[player].start(settings.macros[player][button.dataset.macro], fight.fighters[player].facing);
-    return;
-  }
   button.setPointerCapture(event.pointerId);
   const action = button.dataset.action;
   pointers.set(event.pointerId, { player, action, button });
   tapped.add(settings.bindings[player][action]);
   button.classList.add('active');
+});
+$('#touch').addEventListener('click', event => {
+  const button = event.target.closest('button[data-player]');
+  if (!button || fight.phase !== 'fight' || paused || dialog.open) return;
+  const { player, macro, custom } = button.dataset;
+  if (macro !== undefined) triggerSignature(Number(player), Number(macro));
+  if (custom !== undefined) macros[player].start(settings.macros[player][custom], fight.fighters[player].facing);
+});
+$('#decks').addEventListener('click', event => {
+  const button = event.target.closest('[data-signature]');
+  if (button) triggerSignature(Number(button.closest('[data-deck]').dataset.deck), Number(button.dataset.signature));
 });
 for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
   $('#touch').addEventListener(type, event => {
@@ -203,6 +261,20 @@ function controls(player) {
   return buttons;
 }
 
+function triggerSignature(player, slot) {
+  if (paused || dialog.open || player >= playerCount()) return;
+  const result = fight.requestSignature(player, slot);
+  const fighter = fight.fighters[player];
+  if (result === 'started') macros[player].cancel();
+  if (result === 'energy') {
+    const skill = fighter.character.signatures[slot];
+    if (!fighter.move?.skill) {
+      fighter.signatureBanner = { name: skill.name, result: '能量不足', hits: 0, max: skill.steps.length, until: fight.frame + 64 };
+    }
+    status(skill.name + '需要 ' + skill.cost + ' 能量');
+  }
+}
+
 function setMode(mode) {
   settings.mode = mode;
   persist();
@@ -215,7 +287,20 @@ setupSettings(dialog, {
   beforeOpen: resetInputs,
   afterOpen: refresh,
   afterClose: () => { resetInputs(); refresh(); $('#settings').focus(); },
-  onSave: updated => { settings = updated; persist(); updateDecks(); },
+  onSave: updated => { settings = updated; persist(); updateDecks(); renderTouch(); },
+});
+setupRosterPicker({
+  selection: () => settings.roster,
+  mode: () => settings.mode,
+  confirm(player, character) {
+    opening++;
+    settings.roster[player] = character;
+    fight.lobby(settings.roster);
+    persist();
+    updateDecks();
+    updateHud();
+    refresh();
+  },
 });
 $('#sound').onclick = () => {
   settings.sound = !settings.sound;
@@ -255,20 +340,32 @@ const fighterPanel = (fighter, id) => '<article class="fighter deck-' + id + '">
   + '<div class="health" role="progressbar" aria-label="' + fighter.name + '生命" aria-valuemin="0" aria-valuemax="100"><span></span></div>'
   + '<div class="charge" role="progressbar" aria-label="' + fighter.name + '能量" aria-valuemin="0" aria-valuemax="100"><span></span></div>'
   + '<div class="wins"><i></i><i></i></div><span class="hits"></span></article>';
-$('#hud').innerHTML = fighterPanel(FIGHTERS[0], 0) + '<div class="clock"><b id="timer">' + ROUND_SECONDS
-  + '</b><span id="round">第 1 局</span></div>' + fighterPanel(FIGHTERS[1], 1);
+$('#hud').innerHTML = fighterPanel(fight.selection[0], 0) + '<div class="clock"><b id="timer">' + ROUND_SECONDS
+  + '</b><span id="round">第 1 局</span></div>' + fighterPanel(fight.selection[1], 1);
 const panels = [...document.querySelectorAll('.fighter')];
 
 function updateHud() {
   for (const fighter of fight.fighters) {
     const panel = panels[fighter.id];
+    const character = fighter.character;
+    if (panel.dataset.character !== character.id) {
+      panel.dataset.character = character.id;
+      panel.style.setProperty('--accent', character.color);
+      panel.querySelector('.fighter-name b').textContent = character.name;
+      panel.querySelector('.fighter-name span').textContent = character.roman;
+      panel.querySelector('.health').setAttribute('aria-label', character.name + '生命');
+      panel.querySelector('.charge').setAttribute('aria-label', character.name + '能量');
+    }
     for (const [selector, value] of [['.health', fighter.hp], ['.charge', fighter.energy]]) {
       const bar = panel.querySelector(selector);
       bar.style.setProperty('--fill', value + '%');
       bar.setAttribute('aria-valuenow', value);
     }
     panel.querySelectorAll('.wins i').forEach((marker, index) => marker.classList.toggle('won', index < fighter.wins));
-    panel.querySelector('.hits').textContent = fighter.combo > 1 ? fighter.combo + ' 次连续命中' : '';
+    const banner = fighter.signatureBanner;
+    panel.querySelector('.hits').textContent = banner
+      ? banner.name + ' · ' + (banner.result ?? (banner.hits ? banner.hits + '/' + banner.max + ' 命中' : '起手'))
+      : fighter.combo > 1 ? fighter.combo + ' 次连续命中' : '';
   }
   $('#timer').textContent = Math.ceil(fight.clock / TICKS);
   $('#round').textContent = '第 ' + fight.round + ' 局';
@@ -280,7 +377,7 @@ function updateAnnouncement() {
   announcement.hidden = paused || dialog.open || !['intro', 'roundEnd'].includes(phase);
   if (!announcement.hidden) {
     announcement.textContent = phase === 'intro' ? '第 ' + fight.round + ' 局'
-      : fight.roundWinner === null ? '平局' : FIGHTERS[fight.roundWinner].name + ' 赢得本局';
+      : fight.roundWinner === null ? '平局' : fight.selection[fight.roundWinner].name + ' 赢得本局';
   }
 }
 

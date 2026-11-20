@@ -65,5 +65,22 @@
   ],
   "stale_rows": [],
   "semantic_undeclared": 8,
-  "verdict": "gaps"
+  "verdict": "gaps",
+  "roster_update": {
+    "first_pass": {
+      "semantic_undeclared": 1,
+      "interface_undeclared": 1,
+      "stale_rows": ["A-005", "A-007", "A-008", "A-014"],
+      "findings": ["Signature recovery queue had no ledger entry.", "Touch shortcuts lost access to existing custom macros."]
+    },
+    "followup": {
+      "undeclared": [],
+      "stale_rows": [],
+      "semantic_undeclared": 0,
+      "resolved": ["A-005", "A-007", "A-008", "A-014", "Signature buffering declared by A-022", "Custom touch macros restored and declared by A-023"],
+      "verdict": "provisional",
+      "review_independence": "same-family",
+      "scope": "First-sweep findings only; code inspection confirms separate custom-macro buttons, execution handlers, and refresh after settings changes."
+    }
+  }
 }

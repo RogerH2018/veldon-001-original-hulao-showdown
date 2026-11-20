@@ -1,14 +1,11 @@
-import { PORT } from './input.js';
+import { PORT } from './input.js?v=2';
+import { DEFAULT_ROSTER, findFighter } from './roster.js';
 
 export const WIDTH = 1200;
 export const HEIGHT = 640;
 export const GROUND = 521;
 export const TICKS = 60;
 export const ROUND_SECONDS = 55;
-export const FIGHTERS = [
-  { name: '棱锚', roman: 'ANCHOR', style: '近身 · 重装', color: '#ffb15c', shadow: '#91462e', suit: '#50342c', speed: 3.5, weight: 1.14, reach: 14 },
-  { name: '流梭', roman: 'SHUTTLE', style: '游击 · 轻装', color: '#64eddd', shadow: '#248e91', suit: '#183b4e', speed: 4.25, weight: 1, reach: 0 },
-];
 
 export const MOVES = {
   A: { active: 5, end: 13, reach: 97, damage: 5, stun: 11, drive: 0.4 },
@@ -23,11 +20,11 @@ export const MOVES = {
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const attackButtons = ['D', 'C', 'B', 'A'];
 
-function makeFighter(id, wins = 0) {
+function makeFighter(id, character, wins = 0) {
   return {
-    id, x: id ? 799 : 401, y: 0, vy: 0, facing: id ? -1 : 1, hp: 100, energy: 28,
+    id, character, x: id ? 799 : 401, y: 0, vy: 0, facing: id ? -1 : 1, hp: 100, energy: 42,
     pose: 'idle', move: null, stun: 0, flash: 0, wins, guard: false, combo: 0, comboTimer: 0,
-    input: new Set(), directions: [],
+    input: new Set(), directions: [], pending: null, signatureBanner: null,
   };
 }
 
@@ -38,15 +35,24 @@ function relativeDirection(input, facing) {
 }
 
 export class Fight {
-  constructor(onEvent = () => {}) {
+  constructor(onEvent = () => {}, selection = DEFAULT_ROSTER) {
     this.onEvent = onEvent;
+    this.lobby(selection);
+  }
+
+  lobby(selection = this.selection?.map(character => character.id) ?? DEFAULT_ROSTER) {
+    this.select(selection);
     this.phase = 'lobby';
-    this.fighters = [makeFighter(0), makeFighter(1)];
+    this.fighters = this.selection.map((character, id) => makeFighter(id, character));
     this.effects = [];
     this.projectiles = [];
     this.frame = 0;
     this.round = 1;
     this.clock = ROUND_SECONDS * TICKS;
+  }
+
+  select(selection) {
+    this.selection = DEFAULT_ROSTER.map((fallback, id) => findFighter(selection[id]) ?? findFighter(fallback));
   }
 
   start() {
@@ -56,7 +62,7 @@ export class Fight {
   }
 
   beginRound(wins) {
-    this.fighters = wins.map((value, id) => makeFighter(id, value));
+    this.fighters = wins.map((value, id) => makeFighter(id, this.selection[id], value));
     this.roundWinner = null;
     this.clock = ROUND_SECONDS * TICKS;
     this.phase = 'intro';
@@ -98,7 +104,7 @@ export class Fight {
         fighter.facing *= -1;
         fighter.directions = [];
       }
-      this.updateFighter(fighter, new Set(controls[fighter.id]));
+      this.updateFighter(fighter, new Set(controls[fighter.id]), other);
     }
     this.separate(left, right);
 
@@ -107,13 +113,17 @@ export class Fight {
       const target = this.fighters[1 - fighter.id];
       const action = fighter.move;
       if (!action) continue;
+      if (action.skill) {
+        this.signatureContact(fighter, target, action, contacts);
+        continue;
+      }
       const move = MOVES[action.id];
       if (action.age === move.active) {
         if (action.id === 'surge') {
           this.projectiles.push({ id: fighter.id, x: fighter.x + fighter.facing * 56, y: fighter.y + 74, facing: fighter.facing });
           this.onEvent('surge', fighter.id);
         } else if (fighter.facing * (target.x - fighter.x) > 0
-          && Math.abs(fighter.x - target.x) <= move.reach + FIGHTERS[fighter.id].reach
+          && Math.abs(fighter.x - target.x) <= move.reach + fighter.character.reach
           && Math.abs(fighter.y - target.y) <= 96) {
           contacts.push({ fighter, target, move, blocked: target.guard && !move.breaker });
         }
@@ -133,8 +143,8 @@ export class Fight {
     if (this.clock === 0 || this.fighters.some(fighter => fighter.hp === 0)) this.endRound();
   }
 
-  updateFighter(fighter, input) {
-    const character = FIGHTERS[fighter.id];
+  updateFighter(fighter, input, other) {
+    const character = fighter.character;
     const direction = relativeDirection(input, fighter.facing);
     if (direction !== 5 && direction !== fighter.directions.at(-1)?.direction) {
       fighter.directions.push({ direction, frame: this.frame });
@@ -145,6 +155,8 @@ export class Fight {
     fighter.flash = Math.max(0, fighter.flash - 1);
     fighter.comboTimer = Math.max(0, fighter.comboTimer - 1);
     if (!fighter.comboTimer) fighter.combo = 0;
+    if (fighter.signatureBanner?.until <= this.frame) fighter.signatureBanner = null;
+    if (fighter.pending?.until < this.frame) fighter.pending = null;
     fighter.guard = false;
     if (fighter.y > 0 || fighter.vy > 0) {
       fighter.y = Math.max(0, fighter.y + fighter.vy);
@@ -154,11 +166,26 @@ export class Fight {
       fighter.stun--;
       return;
     }
+    if (!fighter.move && fighter.pending) {
+      const slot = fighter.pending.slot;
+      fighter.pending = null;
+      this.requestSignature(fighter.id, slot);
+    }
     if (!fighter.move && button) this.startMove(fighter, button);
     if (fighter.move) {
-      fighter.move.age++;
-      const move = MOVES[fighter.move.id];
-      if (fighter.move.age < move.active) fighter.x += fighter.facing * move.drive;
+      const action = fighter.move;
+      action.age++;
+      if (action.skill) {
+        const first = action.skill.steps[0];
+        const last = action.skill.steps.at(-1);
+        if (action.age < first.at || (action.confirmed && action.age < last.at)) {
+          const gap = fighter.facing * (other.x - fighter.x);
+          fighter.x += fighter.facing * clamp(gap - 75, 0, action.skill.drive);
+        }
+      } else {
+        const move = MOVES[action.id];
+        if (action.age < move.active) fighter.x += fighter.facing * move.drive;
+      }
     } else {
       const horizontal = Number(input.has(PORT.right)) - Number(input.has(PORT.left));
       const grounded = fighter.y === 0;
@@ -184,6 +211,55 @@ export class Fight {
     this.onEvent('swing', fighter.id);
   }
 
+  requestSignature(id, slot) {
+    const fighter = this.fighters[id];
+    const skill = fighter?.character.signatures[slot];
+    if (this.phase !== 'fight' || !skill || fighter.stun || fighter.y > 65) return 'busy';
+    if (fighter.energy < skill.cost) return 'energy';
+    if (fighter.move) {
+      const end = fighter.move.skill?.end ?? MOVES[fighter.move.id].end;
+      if (end - fighter.move.age > 12) return 'busy';
+      fighter.pending = { slot, until: this.frame + 13 };
+      return 'queued';
+    }
+    fighter.energy -= skill.cost;
+    fighter.move = { id: 'signature', age: 0, skill, confirmed: false, next: 0 };
+    fighter.pose = 'attack';
+    fighter.directions = [];
+    fighter.signatureBanner = { name: skill.name, hits: 0, max: skill.steps.length, until: this.frame + skill.end + 40 };
+    this.onEvent('signature', { id, skill });
+    return 'started';
+  }
+
+  signatureContact(fighter, target, action, contacts) {
+    const { skill } = action;
+    const beat = skill.steps[action.next];
+    if (action.age === beat?.at && (action.next === 0 || action.confirmed)) {
+      const first = action.next === 0;
+      const gap = fighter.facing * (target.x - fighter.x);
+      const inRange = gap > 0 && gap <= skill.reach + fighter.character.reach
+        && Math.abs(fighter.y - target.y) <= (skill.slot === 2 ? 138 : 104);
+      const last = action.next === skill.steps.length - 1;
+      this.effects.push({
+        type: 'strike', id: fighter.id, color: fighter.character.color, family: skill.effect,
+        kind: beat.kind, slot: skill.slot, x: fighter.x, span: skill.slot === 2 ? Math.min(skill.reach, Math.max(115, gap)) : 126, y: GROUND - fighter.y - 92,
+        facing: fighter.facing, frame: this.frame, duration: last ? 22 : 12, last,
+      });
+      if (inRange || !first) {
+        contacts.push({
+          fighter, target, action,
+          move: { damage: beat.damage, stun: last ? 22 : skill.steps[action.next + 1].at - beat.at + 7, push: beat.push },
+          blocked: first && target.guard, skill, beat, last,
+        });
+      } else {
+        fighter.signatureBanner.result = '未命中';
+        this.onEvent('miss', fighter.id);
+      }
+      action.next++;
+    }
+    if (action.age >= skill.end) fighter.move = null;
+  }
+
   separate(first, second) {
     if (Math.abs(first.y - second.y) > 95) return;
     const [left, right] = first.x < second.x ? [first, second] : [second, first];
@@ -193,21 +269,30 @@ export class Fight {
     right.x = left.x + 72;
   }
 
-  land({ fighter, target, move, blocked }) {
-    const damage = blocked ? 0 : Math.round(move.damage * FIGHTERS[fighter.id].weight);
+  land({ fighter, target, move, blocked, action, skill, beat, last = false }) {
+    const damage = blocked ? 0 : Math.round(move.damage * fighter.character.weight);
+    if (action && !blocked) {
+      action.confirmed = true;
+      fighter.signatureBanner.hits++;
+      this.onEvent('signatureHit', { id: fighter.id, skill, beat, last });
+    }
+    if (action && blocked) fighter.signatureBanner.result = '被防住';
+    if (target.move?.skill && target.signatureBanner) target.signatureBanner.result = '被打断';
     target.hp = Math.max(0, target.hp - damage);
     target.stun = blocked ? 8 : move.stun;
     target.pose = blocked ? 'guard' : 'hurt';
     target.move = null;
+    target.pending = null;
     target.flash = blocked ? 4 : 9;
-    target.x = clamp(target.x + fighter.facing * (blocked ? 10 : 27), 71, WIDTH - 71);
-    fighter.energy = Math.min(100, fighter.energy + (blocked ? 2 : 8));
-    target.energy = Math.min(100, target.energy + 5);
+    target.x = clamp(target.x + fighter.facing * (blocked ? 10 : move.push ?? 27), 71, WIDTH - 71);
+    fighter.energy = Math.min(100, fighter.energy + (skill ? (last ? 7 : 1) : blocked ? 2 : 8));
+    target.energy = Math.min(100, target.energy + (skill ? 2 : 5));
     if (!blocked) {
       fighter.combo++;
       fighter.comboTimer = 54;
     }
-    this.effects.push({ x: target.x, y: GROUND - target.y - 100, frame: this.frame, duration: 22, id: fighter.id, blocked });
+    this.effects.push({ x: target.x, y: GROUND - target.y - 100, frame: this.frame, duration: 22,
+      id: fighter.id, color: fighter.character.color, blocked, last });
     this.onEvent(blocked ? 'guard' : 'hit', target.id);
   }
 
@@ -231,6 +316,7 @@ export class Opponent {
   reset() {
     this.next = 0;
     this.intent = [];
+    this.nextSignature = 240;
   }
   controls(fight, level) {
     if (fight.phase !== 'fight') return [];
@@ -241,7 +327,12 @@ export class Opponent {
     if (fight.frame < this.next) return this.intent;
     this.next = fight.frame + (level === 1 ? 29 : level === 2 ? 17 : 10);
     if (cpu.move || cpu.stun) this.intent = [];
-    else if (level > 1 && human.move && gap < 155 && human.move.id !== 'C') this.intent = [away];
+    else if (level > 1 && fight.frame >= this.nextSignature && gap < 365 && !human.guard) {
+      const slot = gap < 122 ? 0 : level === 3 && cpu.energy >= cpu.character.signatures[2].cost && gap < 248 ? 2 : 1;
+      this.nextSignature = fight.frame + (level === 2 ? 295 : 210);
+      fight.requestSignature(1, slot);
+      this.intent = [];
+    } else if (level > 1 && human.move && gap < 155 && human.move.id !== 'C') this.intent = [away];
     else if (gap > 145) this.intent = [toward];
     else {
       const choice = Math.floor(fight.frame / 13) % 6;
