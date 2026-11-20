@@ -1,0 +1,69 @@
+{
+  "review_independence": "same-family",
+  "acceptance_status": "provisional",
+  "undeclared": [
+    {
+      "site": "src/fight.js:58,79,214",
+      "decision": "平局、超时与每局重置",
+      "why_it_matters": "回合制结果",
+      "class": "semantic"
+    },
+    {
+      "site": "src/fight.js:8,26; src/main.js",
+      "decision": "玩家位固定角色，角色属性不对称",
+      "why_it_matters": "玩家位同时决定角色",
+      "class": "semantic"
+    },
+    {
+      "site": "src/fight.js:24,136,174",
+      "decision": "攻击按下触发，多键优先与受限时序",
+      "why_it_matters": "影响手动和宏能否出招",
+      "class": "semantic"
+    },
+    {
+      "site": "src/fight.js:153,163,196",
+      "decision": "站地防御、硬直与能量收益",
+      "why_it_matters": "影响攻防结果",
+      "class": "semantic"
+    },
+    {
+      "site": "src/fight.js:20,28,174,204",
+      "decision": "能量初值、消耗、回充和不足时回退",
+      "why_it_matters": "决定脉冲可用性",
+      "class": "semantic"
+    },
+    {
+      "site": "src/fight.js:146,206; src/main.js",
+      "decision": "短时间命中数曾显示为连击",
+      "why_it_matters": "对手脱离硬直后仍计数",
+      "class": "semantic"
+    },
+    {
+      "site": "src/fight.js:229; src/settings.js:8",
+      "decision": "电脑难度决策频率和防御",
+      "why_it_matters": "影响与电脑的对战",
+      "class": "semantic"
+    },
+    {
+      "site": "src/input.js:63; src/main.js",
+      "decision": "单宏执行、输入合并、朝向快照和受击取消",
+      "why_it_matters": "决定序列执行边界",
+      "class": "semantic"
+    },
+    {
+      "site": "src/settings.js:13,39,49,156",
+      "decision": "持久化失败、默认值恢复",
+      "why_it_matters": "决定设置的恢复范围",
+      "class": "interface"
+    },
+    {
+      "site": "src/main.js",
+      "decision": "暂停、失焦与设置弹窗的运行时行为",
+      "why_it_matters": "影响计时和输入",
+      "class": "interface"
+    }
+  ],
+  "stale_rows": [],
+  "semantic_undeclared": 8,
+  "verdict": "gaps"
+}

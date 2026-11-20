@@ -34,6 +34,8 @@ kbd { display: inline-block; font: 600 .82em ui-monospace, monospace; }
 .brand span { color: var(--muted); }
 .brand i { display: inline-block; width: 18px; height: 18px; background: var(--mint); margin-right: .4rem; clip-path: polygon(0 0, 45% 0, 55% 44%, 70% 18%, 100% 18%, 56% 100%, 34% 100%); }
 .game { max-width: 1242px; margin: 0 auto; padding: 0 1.3rem 2rem; }
+.game:fullscreen { max-width: none; overflow: auto; background: var(--bg); padding: .6rem; }
+.game:fullscreen > .screen { max-width: min(100%, calc((100dvh - 70px) * 1.875)); margin-inline: auto; }
 .stage-caption {
   display: flex; align-items: center; gap: .8rem; background: #13252d; border: 1px solid var(--line);
   border-bottom: 0; border-radius: 10px 10px 0 0; padding: .35rem .8rem; font-size: .88rem;

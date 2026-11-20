@@ -2,7 +2,7 @@
 
 Veldon Game 第 001 款自制游戏。夜潮涌入货运码头，重装的棱锚和轻装的流梭展开对决。
 
-[网页试玩](https://rogerh2018.github.io/veldon-001-original-arc-harbor/) · [Veldon Game 主站](https://rogerh2018.github.io/Veldon-Game/)
+[网页试玩](https://rogerh2018.github.io/veldon-001-original-arc-harbor/) · [Veldon Game 项目](https://github.com/RogerH2018/Veldon-Game)
 
 单人可挑战三个难度的电脑，同屏双人共用键盘或触屏。每局 55 秒，两胜赢得整场。
 

@@ -10,12 +10,12 @@
 </head>
 <body>
   <header class="top">
-    <a class="brand" href="https://rogerh2018.github.io/Veldon-Game/" aria-label="Veldon Game 主站"><i aria-hidden="true"></i>VELDON <span>GAME</span></a>
+    <a class="brand" href="https://github.com/RogerH2018/Veldon-Game" aria-label="Veldon Game 项目"><i aria-hidden="true"></i>VELDON <span>GAME</span></a>
     <nav aria-label="游戏操作"><button id="sound" type="button" aria-pressed="true">声音开启</button><button id="settings" type="button">连招 / 按键设置</button></nav>
   </header>
   <main id="app">
     <section class="game" aria-label="弧港对决">
-      <div class="stage-caption"><span>夜潮货运码头</span><span id="mode-status">单人对战</span><button id="pause" type="button" disabled>暂停 · Esc</button></div>
+      <div class="stage-caption"><span>夜潮货运码头</span><span id="mode-status">单人对战</span><button id="fullscreen" type="button" hidden>全屏</button><button id="pause" type="button" disabled>暂停 · Esc</button></div>
       <div class="screen" id="screen" data-phase="lobby">
         <canvas id="arena" width="1200" height="640" aria-label="夜潮货运码头对战画面"></canvas>
         <div class="hud" id="hud"></div>

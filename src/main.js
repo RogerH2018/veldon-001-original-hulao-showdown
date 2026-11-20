@@ -234,6 +234,21 @@ $('#start').onclick = start;
 $('#pause').onclick = togglePause;
 $('#home').onclick = returnToLobby;
 $('#continue').onclick = () => paused ? togglePause() : start();
+if (document.fullscreenEnabled) {
+  const button = $('#fullscreen');
+  button.hidden = false;
+  button.onclick = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await $('.game').requestFullscreen();
+    } catch {
+      status('浏览器未能进入全屏。');
+    }
+  };
+  document.addEventListener('fullscreenchange', () => {
+    button.textContent = document.fullscreenElement ? '退出全屏' : '全屏';
+  });
+}
 
 const fighterPanel = (fighter, id) => '<article class="fighter deck-' + id + '"><div class="fighter-name"><b>' + fighter.name
   + '</b><span>' + fighter.roman + '</span><small' + (id ? ' id="opponent-label"' : '') + '>' + (id ? 'CPU' : '1P') + '</small></div>'
@@ -253,7 +268,7 @@ function updateHud() {
       bar.setAttribute('aria-valuenow', value);
     }
     panel.querySelectorAll('.wins i').forEach((marker, index) => marker.classList.toggle('won', index < fighter.wins));
-    panel.querySelector('.hits').textContent = fighter.combo > 1 ? fighter.combo + ' 连击' : '';
+    panel.querySelector('.hits').textContent = fighter.combo > 1 ? fighter.combo + ' 次连续命中' : '';
   }
   $('#timer').textContent = Math.ceil(fight.clock / TICKS);
   $('#round').textContent = '第 ' + fight.round + ' 局';
