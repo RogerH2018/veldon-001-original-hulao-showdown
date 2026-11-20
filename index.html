@@ -8,5 +8,55 @@
   <link rel="stylesheet" href="./src/style.css">
   <script type="module" src="./src/main.js"></script>
 </head>
-<body><main id="app"><h1>弧港对决</h1><canvas id="arena" width="1200" height="640" aria-label="对战画面"></canvas></main></body>
+<body>
+  <header class="top">
+    <a class="brand" href="https://rogerh2018.github.io/Veldon-Game/" aria-label="Veldon Game 主站"><i aria-hidden="true"></i>VELDON <span>GAME</span></a>
+    <nav aria-label="游戏操作"><button id="sound" type="button" aria-pressed="true">声音开启</button><button id="settings" type="button">连招 / 按键设置</button></nav>
+  </header>
+  <main id="app">
+    <section class="game" aria-label="弧港对决">
+      <div class="stage-caption"><span>夜潮货运码头</span><span id="mode-status">单人对战</span><button id="pause" type="button" disabled>暂停 · Esc</button></div>
+      <div class="screen" id="screen" data-phase="lobby">
+        <canvas id="arena" width="1200" height="640" aria-label="夜潮货运码头对战画面"></canvas>
+        <div class="hud" id="hud"></div>
+        <section class="lobby" id="lobby" aria-label="选择对战">
+          <p class="series">VELDON ORIGINAL · 001</p>
+          <h1>弧港对决</h1>
+          <p class="subtitle">ARC HARBOR</p>
+          <div class="modes" role="group" aria-label="对战模式">
+            <button id="cpu-mode" type="button" aria-pressed="true">单人对战</button>
+            <button id="local-mode" type="button" aria-pressed="false">双人同屏</button>
+          </div>
+          <label class="difficulty" id="difficulty-control">电脑难度 <select id="difficulty"><option value="1">入门</option><option value="2">标准</option><option value="3">进阶</option></select></label>
+          <button class="primary" id="start" type="button">开始对战 <kbd>Enter</kbd></button>
+        </section>
+        <div class="announcement" id="announcement" aria-hidden="true" hidden></div>
+        <div class="overlay" id="overlay" hidden>
+          <section>
+            <h2 id="overlay-title"></h2><p id="overlay-detail"></p>
+            <button class="primary" id="continue" type="button"></button>
+            <button id="home" type="button">返回模式选择</button>
+          </section>
+        </div>
+      </div>
+      <div id="touch" class="touch" aria-label="触屏操作" hidden></div>
+      <div class="control-decks" id="decks" aria-label="键位速查"></div>
+      <details class="guide">
+        <summary>出招与防御</summary>
+        <p>朝后走或下蹲可以防御，C 可以破防。两胜赢得整场。橙色的棱锚近身攻击更重，薄荷色的流梭移动更快。</p>
+        <p>面向对手输入 <kbd>236A</kbd> 冲刺，<kbd>214B</kbd> 后撤反击，<kbd>236D</kbd> 消耗 40 能量发射脉冲。数字方向以小键盘为准，6 为前，4 为后。</p>
+      </details>
+    </section>
+    <p id="status" role="status" class="visually-hidden"></p>
+  </main>
+  <dialog id="preferences" aria-labelledby="settings-title">
+    <form id="settings-form" novalidate>
+      <header class="dialog-head"><h2 id="settings-title">连招 / 按键设置</h2><button id="close-settings" type="button">关闭</button></header>
+      <div class="settings-tabs" id="settings-tabs" role="group" aria-label="选择玩家"></div>
+      <div id="settings-players"></div>
+      <p class="settings-error" id="settings-error" role="status"></p>
+      <footer class="dialog-foot"><button type="button" id="defaults">恢复默认</button><button type="submit" class="primary">保存设置</button></footer>
+    </form>
+  </dialog>
+</body>
 </html>
