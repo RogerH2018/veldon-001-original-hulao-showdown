@@ -1,4 +1,4 @@
-import { weaponArt } from './art.js?v=3';
+import { weaponArt } from './art.js?v=4';
 
 const ink = '#35252e', gold = '#e0ad62', pale = '#fff0bf';
 const paths = new Map();

@@ -258,3 +258,20 @@ form { padding: 1rem; }
   .lobby h1 small { margin-bottom: .18rem; }
   #roster-skills button { min-height: 38px; }
 }
+.macro-row { grid-template-columns: minmax(64px,.65fr) minmax(120px,1.3fr) minmax(90px,1fr); padding: .7rem 0; border-top: 1px solid var(--line); }
+.command-line, .command-tools, .macro-row .rewrite-command { grid-column: 1 / -1; }
+.command-line { min-height: 1.5em; color: #f3d09b; font-size: .9rem; }
+.command-tools { display: flex; gap: .35rem; flex-wrap: wrap; }
+.command-tools button, .macro-row .rewrite-command { width: auto; justify-self: start; }
+.command-tools [data-clear], .command-tools [data-undo] { color: #d0bba4; }
+.macro-row [hidden] { display:none; }
+#roster-basics { display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap:.25rem; }
+#roster-basics button { padding:.28rem .32rem; font-size:.76rem; }
+#roster-basics button[aria-pressed="true"] { border-color:var(--roster-accent); color:var(--roster-accent); }
+.deck-macros small { white-space:normal; line-height:1.35; }
+@media (max-width:700px) {
+  #roster-basics { grid-column:1 / -1; grid-row:3; }
+  .roster-preview canvas { grid-row:1 / span 2; }
+  #roster-skills { grid-row:2; }
+  .macro-row { grid-template-columns: .64fr 1.15fr 1fr; }
+}

@@ -1,10 +1,10 @@
-import { Fight, Opponent, ROUND_SECONDS, TICKS } from './fight.js?v=3';
-import { ACTIONS, MacroPlayer, PORT, keyName, normalizeKey } from './input.js?v=3';
-import { createRenderer, preloadStage } from './render.js?v=3';
-import { FightSound } from './sound.js?v=3';
-import { loadSettings, saveSettings, setupSettings, labels } from './settings.js?v=3';
-import { preloadFighter } from './art.js?v=3';
-import { setupRosterPicker } from './picker.js?v=3';
+import { Fight, Opponent, ROUND_SECONDS, TICKS } from './fight.js?v=4';
+import { ACTIONS, MacroPlayer, PORT, keyName, normalizeKey } from './input.js?v=4';
+import { createRenderer, preloadStage } from './render.js?v=4';
+import { FightSound } from './sound.js?v=4';
+import { loadSettings, saveSettings, setupSettings, labels } from './settings.js?v=4';
+import { preloadFighter } from './art.js?v=4';
+import { setupRosterPicker } from './picker.js?v=4';
 
 const $ = selector => document.querySelector(selector);
 const dialog = $('#preferences');
@@ -15,6 +15,7 @@ let loading = false;
 let opening = 0;
 const held = new Set();
 const tapped = new Set();
+const pressOrder = [[], []];
 const pointers = new Map();
 const macros = [new MacroPlayer(), new MacroPlayer()];
 const cpu = new Opponent();
@@ -31,7 +32,7 @@ const fight = new Fight((event, id) => {
     status('开始对战');
   }
   if (event === 'counter') status(fight.fighters[id.id].character.name + '打出了克制');
-  if (event === 'match') status(fight.selection[id].name + '获胜');
+  if (event === 'match') status(id === null ? '平局' : fight.selection[id].name + '获胜');
 }, settings.roster);
 const render = createRenderer($('#arena'));
 const playerCount = () => settings.mode === 'local' ? 2 : 1;
@@ -43,9 +44,10 @@ function persist() {
 function resetInputs() {
   held.clear();
   tapped.clear();
+  pressOrder.forEach(order => { order.length = 0; });
   pointers.clear();
   macros.forEach(macro => macro.cancel());
-  fight.fighters.forEach(fighter => { fighter.pending = null; });
+  fight.fighters.forEach(fighter => { fighter.pending = null; fighter.commandHistory.length = 0; fighter.input.clear(); fighter.directions.length = 0; });
   document.querySelectorAll('.touch button.active').forEach(button => button.classList.remove('active'));
 }
 
@@ -101,7 +103,7 @@ function updateDecks() {
       const label = document.createElement(auto ? 'span' : 'button');
       const key = document.createElement('kbd');
       const detail = document.createElement('small');
-      detail.textContent = skill.steps.length + ' 段' + (skill.cost ? ' · ' + skill.cost + ' 能量' : '');
+      detail.textContent = skill.commandText + ' · ' + skill.steps.length + ' 段' + (skill.cost ? ' · ' + skill.cost + ' 能量' : '');
       if (!auto) {
         label.type = 'button';
         label.className = 'skill-trigger';
@@ -128,7 +130,7 @@ function updateDecks() {
 function renderTouch() {
   $('#touch').innerHTML = fight.selection.slice(0, playerCount()).map((fighter, index) => {
     const buttons = actions => actions.map(action => '<button type="button" aria-label="' + fighter.name + ' ' + labels[action]
-      + '" data-player="' + index + '" data-action="' + action + '">' + (arrows[action] ?? action) + '</button>').join('');
+      + '" data-player="' + index + '" data-action="' + action + '">' + (arrows[action] ?? labels[action]) + '</button>').join('');
     const shortcuts = fighter.signatures.map((skill, i) => '<button type="button" data-player="' + index
       + '" data-macro="' + i + '">' + skill.name + '</button>').join('');
     const custom = settings.macros[index].map((macro, i) => macro.source === 'custom' ? '<button type="button" data-player="'
@@ -205,10 +207,11 @@ window.addEventListener('keydown', event => {
     held.add(key);
     if (!event.repeat) {
       tapped.add(key);
+      if (action) pressOrder[player].push(action);
       if (slot >= 0) {
         const macro = settings.macros[player][slot];
         if (macro.source === 'signature') triggerSignature(player, slot);
-        else macros[player].start(macro, fight.fighters[player].facing);
+        else macros[player].start(macro, fight.fighters[player].facing, fight.fighters[player].character);
       }
     }
   }
@@ -227,6 +230,7 @@ $('#touch').addEventListener('pointerdown', event => {
   button.setPointerCapture(event.pointerId);
   const action = button.dataset.action;
   pointers.set(event.pointerId, { player, action, button });
+  pressOrder[player].push(action);
   tapped.add(settings.bindings[player][action]);
   button.classList.add('active');
 });
@@ -235,7 +239,7 @@ $('#touch').addEventListener('click', event => {
   if (!button || fight.phase !== 'fight' || paused || dialog.open) return;
   const { player, macro, custom } = button.dataset;
   if (macro !== undefined) triggerSignature(Number(player), Number(macro));
-  if (custom !== undefined) macros[player].start(settings.macros[player][custom], fight.fighters[player].facing);
+  if (custom !== undefined) macros[player].start(settings.macros[player][custom], fight.fighters[player].facing, fight.fighters[player].character);
 });
 $('#decks').addEventListener('click', event => {
   const button = event.target.closest('[data-signature]');
@@ -251,7 +255,9 @@ for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
 }
 
 function controls(player) {
-  const buttons = macros[player].advance().slice();
+  const macro = macros[player];
+  const buttons = macro.advance(fight.fighters[player]).slice();
+  if (macro.pressed) pressOrder[player].push(macro.pressed);
   for (const action of ACTIONS) {
     const key = settings.bindings[player][action];
     if (held.has(key) || tapped.has(key)) buttons.push(PORT[action]);
@@ -399,7 +405,8 @@ function animate(timestamp) {
   previous = timestamp;
   while (remainder >= tick) {
     if (!paused && !dialog.open && fight.phase !== 'lobby' && fight.phase !== 'matchEnd') {
-      fight.step([controls(0), settings.mode === 'local' ? controls(1) : cpu.controls(fight, settings.difficulty)]);
+      fight.step([controls(0), settings.mode === 'local' ? controls(1) : cpu.controls(fight, settings.difficulty)], pressOrder);
+      pressOrder.forEach(order => { order.length = 0; });
       tapped.clear();
     }
     remainder -= tick;

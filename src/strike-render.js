@@ -47,7 +47,20 @@ export function drawStrike(ctx, event, age) {
   ctx.globalAlpha = fade;
   const beam = ['volley', 'thrust', 'rush', 'cast', 'burst'].includes(kind);
   ctx.fillStyle = color;
-  if (beam) {
+  if (kind === 'palm' || kind === 'elbow' || kind === 'deflect') {
+    ctx.save();ctx.translate(span*.71,-4);ctx.rotate(kind==='deflect'?-.65:.13);
+    for(let i=0;i<3;i++) {
+      const r=(12+age*32+i*7)*scale;
+      ctx.beginPath();ctx.ellipse(i*6,0,r*.49,r,0,-1.8,kind==='palm'?2.9:1.8);
+      ctx.strokeStyle=i===1?'#fff3ce':color;ctx.lineWidth=i===2?2:4;ctx.stroke();
+    }
+    if(kind==='elbow') path(ctx,[[-36,9],[-8,-12],[22,1],[-3,9]],color,5);
+    ctx.restore();
+  } else if (kind === 'draw') {
+    const edge=span+age*17;
+    path(ctx,[[12,29],[edge*.65,3],[edge,-29]],color,7*scale);
+    path(ctx,[[28,20],[edge*.72,-2],[edge+4,-31]],'#fff4d0',2*scale);
+  } else if (beam) {
     const start = 26 + age * 21, end = span + (slot < 0 ? 0 : age * 11);
     const mid = (start + end) / 2, thick = kind === 'burst' ? 23 : kind === 'cast' ? 12 : 6;
     ctx.beginPath(); ctx.moveTo(start, 5);

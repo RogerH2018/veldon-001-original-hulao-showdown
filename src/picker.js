@@ -1,8 +1,9 @@
-import { drawPortrait, preloadFighter } from './art.js?v=3';
-import { drawActor } from './fighter-render.js?v=3';
-import { MOVES } from './fight.js?v=3';
-import { drawStrike } from './strike-render.js?v=3';
-import { findFighter, ROSTER, TEAMS } from './roster.js?v=3';
+import { CONTROL_NAMES } from './input.js?v=4';
+import { drawPortrait, preloadFighter } from './art.js?v=4';
+import { drawActor } from './fighter-render.js?v=4';
+import { MOVES } from './fight.js?v=4';
+import { drawStrike } from './strike-render.js?v=4';
+import { findFighter, ROSTER, TEAMS } from './roster.js?v=4';
 
 export function setupRosterPicker({ selection, mode, confirm }) {
   const dialog = document.querySelector('#roster-dialog');
@@ -19,19 +20,22 @@ export function setupRosterPicker({ selection, mode, confirm }) {
   let playOnce = false;
   function showPreview(time) {
     if (!dialog.open || !candidate) return;
-    const skill = candidate.signatures[selectedSkill];
+    const normal = candidate.techniques[selectedSkill];
+    const skill = normal ? null : candidate.signatures[selectedSkill];
+    const end = skill?.end ?? MOVES[selectedSkill].end;
+    const beats = skill?.steps ?? [{at:MOVES[selectedSkill].active, kind:normal.kind}];
     const elapsed = Math.max(0, Math.floor((time - previewStart) * .06));
-    const tick = reduced.matches ? (playOnce ? elapsed : skill.end + 1) : elapsed % (skill.end + 62);
-    const move = tick <= skill.end ? { id: 'signature', skill, age: tick } : null;
+    const tick = reduced.matches ? (playOnce ? elapsed : end + 1) : elapsed % (end + 62);
+    const move = tick <= end ? { id: skill ? 'signature' : selectedSkill, skill, age: tick } : null;
     ctx.clearRect(0, 0, portrait.width, portrait.height);
-    ctx.save(); ctx.translate(124, 228); ctx.scale(1.19, 1.19);
+    ctx.save(); ctx.translate(165, 260); ctx.scale(1.08, 1.08);
     ctx.fillStyle = '#211b1d80'; ctx.beginPath(); ctx.ellipse(0, 1, 44, 7, 0, 0, 2 * Math.PI); ctx.fill();
     const drawn = drawActor(ctx, { character: candidate, move, y: 0, pose: 'idle' }, reduced.matches ? tick : elapsed, MOVES);
     if (drawn) portrait.dataset.ready = 'true';
-    for (const [i, beat] of skill.steps.entries()) {
+    for (const [i, beat] of beats.entries()) {
       const age = (tick - beat.at) / 15;
-      if (age >= 0 && age < 1) drawStrike(ctx, { x:0, y:-82, span:105, family:skill.effect, color:candidate.color,
-        slot:selectedSkill, kind:beat.kind, last:i===skill.steps.length-1, frame:beat.at, facing:1 }, age);
+      if (age >= 0 && age < 1) drawStrike(ctx, { x:0, y:-82, span:105, family:candidate.effect, color:candidate.color,
+        slot:skill?.slot ?? -1, kind:beat.kind, last:!!skill && i===beats.length-1, frame:beat.at, facing:1 }, age);
     }
     ctx.restore();
     animation = requestAnimationFrame(showPreview);
@@ -40,7 +44,7 @@ export function setupRosterPicker({ selection, mode, confirm }) {
     selectedSkill = index;
     playOnce = manual;
     previewStart = performance.now();
-    dialog.querySelectorAll('[data-preview]').forEach((b,i) => b.setAttribute('aria-pressed', i === index));
+    dialog.querySelectorAll('[data-preview],[data-basic]').forEach(b => b.setAttribute('aria-pressed', (b.dataset.basic ?? Number(b.dataset.preview)) === index));
     cancelAnimationFrame(animation);
     animation = requestAnimationFrame(showPreview);
   }
@@ -62,6 +66,13 @@ export function setupRosterPicker({ selection, mode, confirm }) {
     preview.style.setProperty('--roster-accent', character.color);
     dialog.querySelector('#roster-name').textContent = character.name;
     dialog.querySelector('#roster-style').textContent = character.roman + ' · ' + character.family + ' / ' + character.style;
+    dialog.querySelector('#roster-basics').replaceChildren(...['A','C','B','D'].map(id => {
+      const button=document.createElement('button');
+      button.type='button'; button.dataset.basic=id;
+      button.textContent=CONTROL_NAMES[id]+' · '+character.techniques[id].name;
+      button.onclick=()=>selectSkill(id,true);
+      return button;
+    }));
     dialog.querySelector('#roster-skills').replaceChildren(...character.signatures.map((skill, i) => {
       const line = document.createElement('li');
       const play = document.createElement('button');
@@ -72,7 +83,7 @@ export function setupRosterPicker({ selection, mode, confirm }) {
       const name = document.createElement('strong');
       const detail = document.createElement('span');
       name.textContent = skill.name;
-      detail.textContent = skill.description + ' · ' + skill.steps.length + '段' + (skill.cost ? ' · ' + skill.cost + ' 能量' : '');
+      detail.textContent = skill.commandText + ' · ' + skill.steps.length + ' 段' + (skill.cost ? ' · ' + skill.cost + ' 能量' : '');
       play.append(name, detail);
       line.append(play);
       return line;

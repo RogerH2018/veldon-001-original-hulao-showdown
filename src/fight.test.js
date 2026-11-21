@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compileCombo, DEFAULT_BINDINGS, DEFAULT_MACROS, MacroPlayer, normalizeKey, PORT } from './input.js?v=3';
-import { Fight, MOVES, Opponent } from './fight.js?v=3';
-import { DEFAULT_ROSTER, ROSTER } from './roster.js?v=3';
-import { migrateSettings, validateSettings } from './settings.js?v=3';
+import { compileCombo, DEFAULT_BINDINGS, DEFAULT_MACROS, MacroPlayer, normalizeKey, PORT } from './input.js?v=4';
+import { Fight, MOVES, Opponent } from './fight.js?v=4';
+import { DEFAULT_ROSTER, ROSTER } from './roster.js?v=4';
+import { migrateSettings, validateSettings } from './settings.js?v=4';
 
 function advance(fight, count, player = [], opponent = []) {
   for (let tick = 0; tick < count; tick++) fight.step([player, opponent]);

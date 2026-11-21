@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Fight, MOVES } from './fight.js?v=3';
-import { PORT, DEFAULT_BINDINGS, DEFAULT_MACROS } from './input.js?v=3';
-import { ROSTER, DEFAULT_ROSTER } from './roster.js?v=3';
-import { motionAt } from './motion.js?v=3';
-import { migrateSettings, validateSettings } from './settings.js?v=3';
+import { Fight, MOVES } from './fight.js?v=4';
+import { PORT, DEFAULT_BINDINGS, DEFAULT_MACROS } from './input.js?v=4';
+import { ROSTER, DEFAULT_ROSTER } from './roster.js?v=4';
+import { motionAt } from './motion.js?v=4';
+import { migrateSettings, validateSettings } from './settings.js?v=4';
 
 const tick = (fight, controls = [[],[]]) => fight.step(controls);
 function duel() {

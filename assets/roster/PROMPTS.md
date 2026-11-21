@@ -1,6 +1,6 @@
 # 《三国小将·虎牢争锋》美术提示词
 
-内置 ImageGen 绘制了十张透明头像图集和虎牢关背景。角色的躯干、衣甲、兵器与动作由游戏在 Canvas 中绘制。每张图集按从左到右、从上到下的顺序排列。
+内置 ImageGen 绘制了十张透明头像图集和虎牢关背景。新版衣甲、手脚和四肢的绘图记录见[人物身体素材](../rig/PROMPTS.md)。每张图集按从左到右、从上到下的顺序排列。
 
 ## 十张头像图集的共同提示词
 
@@ -50,9 +50,6 @@ Zhang Jiao, yellow turban elder mystic with forked silver beard and small sun br
 
 Use case: illustration-story. Production background painting for a premium original Three Kingdoms chibi side-on duel game, a panoramic widescreen 16:9 theatrical establishing shot of Hulao Pass at sunset. Art directed hand inked 2D gouache and Chinese woodblock, pale apricot and ochre sun behind layered jagged ink-teal mountains across the left middle distance, river mist, a late Eastern Han rammed-earth pass and two dark Han watchtowers and their vermilion banners on the right middle ground. Cropped heavy war drum and windblown battle standard far left edge, framing vermilion standard and branch on far right. Intentionally quiet middle/upper central area for game titles to be superimposed. Flat wide weathered sandstone practice square with warm flagstones and a few maple leaves in the bottom quarter, clear action plane: fighters' feet will align at 81% image height and need a grounded flat surface across full width. Soft warm reflected light, sunset glow, desaturated lacquer-red banners with a simple tiger insignia. Restrained beautiful fine contour lines and print texture, sophisticated art-book color harmony. Full bleed, no text or calligraphy, no logos, no HUD, no characters, no silhouettes of fighters, no collage or borders. Landscape horizontal 16:9.
 
-## 衣甲图集
-
-Use case: stylized-concept. Game sprite atlas of ten separate HEADLESS, ARMLESS AND LEGLESS Han-era chibi warrior TORSO GARMENTS. Matches a gouache-and-ink Chinese Three Kingdoms super-deformed puppet game. Landscape, precisely FIVE equal columns and TWO equal rows in this row-major order: (1) jade emerald Han general lamellar cuirass with gilded dragon motif, (2) ivory and silver-blue scale armor with blue sash, (3) cinnabar red cavalry armor and gold details, (4) blackened iron charcoal scale armor with bronze belt, (5) indigo and gold high court battle robe, (6) ivory feather-patterned strategist's crossed-collar silk short robe with teal trim, (7) jade-teal sailor's Han crossed-collar tunic, (8) ochre and bronze heavy tiger-plated lamellar armor, (9) rich plum lavender dancer's crossed silk vest with flowing short scalloped skirts, (10) warm russet-brown archer's hide cuirass with leather strap. Each piece is an attractive miniature doll's broad-shouldered tapered BODY from collar to UPPER THIGHS with short battle skirt/coat tails, tiny armholes at the sides; NO arms, no sleeves beyond the upper shoulder, no hands, NO heads, no necks or skin, no legs or boots, no weapons, no mannequin, no background ground shadows. Tilt every chest about 10 degrees to the viewer's right, close to front. Thick polished dark-plum ink outlines, finely rendered gold studs, silk piping, bold clean shadows, asymmetrically draped belts, warm upper left highlights. Ten evenly spaced isolated objects, sufficient wide margin between each separate torso on perfectly transparent alpha canvas. Near-square, short and wide chibi proportions. No text, lettering, boxes or grid. Keep all elements of each object visibly separate within its own cell.
 
 ## 兵器图集
 

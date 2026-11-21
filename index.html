@@ -7,8 +7,8 @@
   <meta name="theme-color" content="#261d20">
   <link rel="icon" href="data:,">
   <title>三国小将·虎牢争锋 · Veldon Game</title>
-  <link rel="stylesheet" href="./src/style.css?v=3">
-  <script type="module" src="./src/main.js?v=3"></script>
+  <link rel="stylesheet" href="./src/style.css?v=4">
+  <script type="module" src="./src/main.js?v=4"></script>
 </head>
 <body>
   <header class="top">
@@ -50,9 +50,9 @@
       <div class="control-decks" id="decks" aria-label="键位速查"></div>
       <details class="guide">
         <summary>出招与克制 <small>快击克重破 · 重破克突进 · 突进克快击</small></summary>
-        <p><kbd>A</kbd> 快击打断重破，<kbd>C</kbd> 重破拦住突进，<kbd>B</kbd> 突进抢过快击。双方在攻击距离内交锋，优势招式命中时伤害增加 25%，硬直延长 5 帧。优势招式离自己的击点只剩 5 帧时，就能提前截住来招。<kbd>D</kbd> 上挑可迎击跳入的对手。</p>
-        <p>后退或下蹲可以防御。普通重破 C 能破防。三套专属连招依次属于快击、突进、重破，首击命中才会接续，首击均可防御。默认快捷键为 1P 的 L、O、P 和 2P 的 3、6、9。先赢两局取胜。</p>
-        <p>面朝对手输入 <kbd>236A</kbd> 突阵，<kbd>214B</kbd> 回身反击，<kbd>236D</kbd> 消耗 40 能量发出劲风。数字按小键盘方向排列，6 为前，4 为后。</p>
+        <p>快击打断重破，重破拦住突进，突进抢过快击。双方在攻击距离内交锋，优势招式命中时伤害增加 25%，硬直延长 5 帧。优势招式离自己的击点只剩 5 帧时，就能提前截住来招。上挑可迎击跳入的对手。</p>
+        <p>后退或下蹲可以防御。普通重破能破防。三套专属连招依次属于快击、突进、重破，首击命中才会接续，首击均可防御。默认快捷键为 1P 的 L、O、P 和 2P 的 3、6、9。先赢两局取胜。</p>
+        <p>在点将台或下方招式表查看四步输入。例如关羽的「抚髯挑月」按左、快击、下、快击。左和右始终指屏幕方向。连续两次同键时，先松开再按。也可以在设置里用八个按钮编排自己的连招。</p>
       </details>
     </section>
     <p id="status" role="status" class="visually-hidden"></p>
@@ -67,8 +67,9 @@
     <div class="roster-layout">
       <div class="roster-list" id="roster-list" aria-label="角色名单"></div>
       <aside class="roster-preview" id="roster-preview" aria-label="角色和连招">
-        <canvas id="roster-portrait" width="340" height="256" aria-label="所选人物的演武动作"></canvas>
+        <canvas id="roster-portrait" width="390" height="286" aria-label="所选人物的演武动作"></canvas>
         <div class="roster-identity"><h3 id="roster-name"></h3><p id="roster-style"></p></div>
+        <div id="roster-basics" aria-label="四种基础招式演示"></div>
         <ol id="roster-skills" aria-label="点击招式预演"></ol>
         <button class="primary" id="roster-confirm" type="button">确认角色</button>
       </aside>

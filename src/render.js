@@ -1,6 +1,6 @@
-import { GROUND, HEIGHT, MOVES, WIDTH } from './fight.js?v=3';
-import { drawFighter } from './fighter-render.js?v=3';
-import { drawStrike } from './strike-render.js?v=3';
+import { GROUND, HEIGHT, MOVES, WIDTH } from './fight.js?v=4';
+import { drawFighter } from './fighter-render.js?v=4';
+import { drawStrike } from './strike-render.js?v=4';
 
 const backdrop = new Image();
 backdrop.src = new URL('../assets/hulao.webp', import.meta.url).href;

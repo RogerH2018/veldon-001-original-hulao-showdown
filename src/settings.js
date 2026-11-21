@@ -1,11 +1,11 @@
-import { ACTIONS, DEFAULT_BINDINGS, DEFAULT_MACROS, compileCombo, keyName, normalizeKey } from './input.js?v=3';
-import { DEFAULT_ROSTER, findFighter } from './roster.js?v=3';
+import { ACTIONS, DEFAULT_BINDINGS, DEFAULT_MACROS, OLD_DEFAULTS, CONTROL_NAMES, EDITOR_ACTIONS, namedActions, describeCombo, compileCombo, keyName, normalizeKey } from './input.js?v=4';
+import { DEFAULT_ROSTER, findFighter } from './roster.js?v=4';
 
 const $ = selector => document.querySelector(selector);
 const storageKey = 'veldon.hulao.v1';
 const legacyMacroNames = ['迎潮', '回流', '放电'];
 const reserved = new Set(['Escape', 'Enter', 'Tab', 'MetaLeft', 'MetaRight', 'AltLeft', 'AltRight', 'ControlLeft', 'ControlRight']);
-export const labels = { up: '上', left: '左', down: '下', right: '右', A: '快击', B: '突进', C: '重破', D: '上挑' };
+export const labels = CONTROL_NAMES;
 const defaults = () => ({
   mode: 'cpu', difficulty: 2, sound: true,
   roster: [...DEFAULT_ROSTER],
@@ -57,9 +57,12 @@ export function migrateSettings(saved) {
     const previous = DEFAULT_MACROS[player][index];
     if (slot.source === undefined) {
       const renamed = ![previous.name, legacyMacroNames[index]].includes(slot.name);
-      slot.source = renamed || slot.sequence !== previous.sequence || slot.gap !== previous.gap ? 'custom' : 'signature';
+      slot.source = renamed || ![previous.sequence, OLD_DEFAULTS[index]].includes(slot.sequence) || slot.gap !== previous.gap ? 'custom' : 'signature';
     }
-    if (slot.source === 'signature' && slot.name === legacyMacroNames[index]) slot.name = previous.name;
+    if (slot.source === 'signature') {
+      if (slot.name === legacyMacroNames[index]) slot.name = previous.name;
+      if (slot.sequence === OLD_DEFAULTS[index]) slot.sequence = previous.sequence;
+    }
   }));
   return saved;
 }
@@ -102,13 +105,14 @@ export function setupSettings(dialog, callbacks) {
     $('#settings-players').innerHTML = fighters.map((fighter, index) => '<section class="settings-pane" data-pane="' + index
       + '"><h3>方向与攻击</h3><div class="binding-grid">'
       + ACTIONS.map(action => '<label>' + labels[action] + ' <button type="button" data-field="binding" data-value="' + action + '"></button></label>').join('')
-      + '</div><h3>快捷连招</h3><p class="hint">默认使用专属技。切换到自定义时可编辑指令。A W8 236A 表示轻击、等待 8 帧，再冲刺。</p>'
-      + draft.macros[index].map((slot, i) => '<div class="macro-row"><label>快捷键 <button type="button" data-field="key" data-value="' + i
-        + '"></button></label><label>招式来源 <select data-slot="' + i + '" data-prop="source"><option value="signature">'
-        + fighter.signatures[i].name + '</option><option value="custom">自定义</option></select></label>'
-        + '<label>名称 <input maxlength="20" data-slot="' + i + '" data-prop="name"></label><label>指令 <input maxlength="160" data-slot="'
-        + i + '" data-prop="sequence"></label><label>间隔帧 <input type="number" min="6" max="30" data-slot="' + i
-        + '" data-prop="gap"></label></div>').join('') + '</section>').join('');
+      + '</div><h3>快捷连招</h3><p class="hint">选「自定义」后，按实际出招顺序点方向和招式。同一方向可以连点，左右以屏幕为准。</p>'
+      + draft.macros[index].map((_, i) => '<div class="macro-row" data-row="'+i+'"><label>快捷键 <button type="button" data-field="key" data-value="'+i
+        +'"></button></label><label>招式来源 <select data-prop="source"><option value="signature">'+fighter.signatures[i].name
+        +'</option><option value="custom">自定义</option></select></label><label data-custom-name>名称 <input maxlength="20" data-prop="name"></label>'
+        +'<output class="command-line" aria-live="polite"></output><div class="command-tools" aria-label="编排连招">'
+        +EDITOR_ACTIONS.map(key => '<button type="button" data-add="'+key+'">'+labels[key]+'</button>').join('')
+        +'<button type="button" data-undo>撤销</button><button type="button" data-clear>清空</button></div>'
+        +'<button class="rewrite-command" type="button" data-rewrite>重新编排</button></div>').join('') + '</section>').join('');
     dialog.querySelectorAll('[data-pane]').forEach(pane => {
       const player = Number(pane.dataset.pane);
       pane.querySelectorAll('button[data-field]').forEach(button => {
@@ -121,20 +125,40 @@ export function setupSettings(dialog, callbacks) {
           button.setAttribute('aria-pressed', 'true');
         };
       });
-      pane.querySelectorAll('input').forEach(input => {
-        const { slot, prop } = input.dataset;
-        input.value = draft.macros[player][slot][prop];
-        input.oninput = () => { draft.macros[player][slot][prop] = prop === 'gap' ? Number(input.value) : input.value; };
-      });
-      pane.querySelectorAll('select[data-prop="source"]').forEach(select => {
-        const { slot } = select.dataset;
-        select.value = draft.macros[player][slot].source;
-        const updateSource = () => {
-          draft.macros[player][slot].source = select.value;
-          select.closest('.macro-row').querySelectorAll('input').forEach(input => { input.disabled = select.value === 'signature'; });
+      pane.querySelectorAll('[data-row]').forEach(row => {
+        const i=Number(row.dataset.row), slot=draft.macros[player][i], skill=fighters[player].signatures[i];
+        const source=row.querySelector('select'), name=row.querySelector('input');
+        const output=row.querySelector('output'), tools=row.querySelector('.command-tools'), rewrite=row.querySelector('[data-rewrite]');
+        source.value=slot.source;
+        name.value=slot.name;
+        name.oninput=()=>{ slot.name=name.value; };
+        function showCommand() {
+          const custom=slot.source==='custom', legacy=!!slot.sequence && !namedActions(slot.sequence);
+          row.querySelector('[data-custom-name]').hidden=!custom;
+          tools.hidden=!custom || legacy;
+          rewrite.hidden=!custom || !legacy;
+          output.textContent=custom ? (slot.sequence ? describeCombo(slot.sequence) : '点一个方向或招式开始')
+            + (legacy ? '（旧编排，段间 '+slot.gap+' 帧）' : '') : skill.commandText;
+          row.querySelector('[data-undo]').disabled=row.querySelector('[data-clear]').disabled=!slot.sequence;
+        }
+        source.onchange=()=>{
+          slot.source=source.value;
+          if (slot.source==='signature' && !slot.sequence) slot.sequence=DEFAULT_MACROS[player][i].sequence;
+          showCommand();
         };
-        select.onchange = updateSource;
-        updateSource();
+        rewrite.onclick=()=>{ slot.sequence=''; showCommand(); tools.querySelector('button').focus(); };
+        tools.onclick=event=>{
+          const button=event.target.closest('button');
+          if (!button) return;
+          let keys=namedActions(slot.sequence) ?? [];
+          if (button.hasAttribute('data-clear')) keys=[];
+          else if (button.hasAttribute('data-undo')) keys.pop();
+          else if (keys.length<20) keys.push(button.dataset.add);
+          else { feedback('一套自定义连招最多 20 步。'); return; }
+          slot.sequence=keys.map(key=>labels[key]).join(' ');
+          feedback(''); showCommand();
+        };
+        showCommand();
       });
     });
     dialog.querySelectorAll('[data-tab]').forEach(button => {
