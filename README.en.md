@@ -52,6 +52,10 @@ Open the address printed by the server, normally `http://127.0.0.1:4173/`. The b
 
 Each of the 100 fighters has an individual costume, four named basic moves and three signature combos. The hands, elbows, knees and ankles follow the fighter’s choreography. The weapon follows its grip, and archery, dual blades and zither playing have different hand poses. The wrist joins its sleeve, and the boots roll from heel to toe during a step. ImageGen supplied the portraits, body art, major weapons and Hulao Pass backdrop. These assets load locally with the game. The logo comes from the Veldon Game project. [Portrait, weapon and scenery prompts](assets/roster/PROMPTS.md) · [Costume and limb prompts](assets/rig/PROMPTS.md) · [Veldon Game](https://github.com/RogerH2018/Veldon-Game)
 
+## Help improve the game
+
+Players and developers are welcome to help make Hulao Showdown better. Does a fighter’s combo feel awkward? Is a move too strong, or could an animation feel more natural? Share playtest feedback, bug reports, and ideas in GitHub Issues. If you’d like to improve the gameplay, art, sound, or translations, we welcome pull requests. [Share feedback](https://github.com/RogerH2018/veldon-001-original-hulao-showdown/issues) · [Contribute a change](https://github.com/RogerH2018/veldon-001-original-hulao-showdown/pulls)
+
 ## License
 
 © 2026 Veldon Game. This project is licensed under the MIT License. Include the copyright and permission notices when you distribute copies or substantial portions. [Full license](LICENSE)

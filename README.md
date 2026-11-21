@@ -52,6 +52,10 @@ npm test
 
 100 位武将各有独立衣甲、四个具名基础招式及三套专属连招。双手、肩肘、膝踝和两脚随各自的动作谱分开运动。兵刃轨迹跟随握点，弓弦、双剑与琴弦各有自己的双手姿势。手腕从袖口自然伸出，短靴在踏步和落地时由脚跟向前掌过渡。头像、身体部件、主要兵器与虎牢关背景使用 ImageGen 绘制，随游戏本地加载。品牌图标取自 Veldon Game 主项目。[头像、兵器与背景](assets/roster/PROMPTS.md) · [衣甲与四肢](assets/rig/PROMPTS.md) · [Veldon Game](https://github.com/RogerH2018/Veldon-Game)
 
+## 欢迎一起改进游戏
+
+欢迎玩家和开发者一起把《虎牢争锋》做得更好。哪位武将的连招按起来不顺？哪招太强，或者哪段动画还可以更自然？欢迎把试玩感受、问题和点子发到 GitHub Issues。想动手改进玩法、美术、音效或翻译，也欢迎提交 Pull Request。[反馈问题和建议](https://github.com/RogerH2018/veldon-001-original-hulao-showdown/issues) · [提交改进](https://github.com/RogerH2018/veldon-001-original-hulao-showdown/pulls)
+
 ## 许可证
 
 © 2026 Veldon Game。本项目采用 MIT 许可证，使用或分发时请保留版权声明和许可证文本。[MIT 许可证全文](LICENSE)
