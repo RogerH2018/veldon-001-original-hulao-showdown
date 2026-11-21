@@ -1,5 +1,8 @@
-import { drawPortrait } from './art.js';
-import { findFighter, ROSTER, TEAMS } from './roster.js';
+import { drawPortrait, preloadFighter } from './art.js?v=3';
+import { drawActor } from './fighter-render.js?v=3';
+import { MOVES } from './fight.js?v=3';
+import { drawStrike } from './strike-render.js?v=3';
+import { findFighter, ROSTER, TEAMS } from './roster.js?v=3';
 
 export function setupRosterPicker({ selection, mode, confirm }) {
   const dialog = document.querySelector('#roster-dialog');
@@ -10,6 +13,37 @@ export function setupRosterPicker({ selection, mode, confirm }) {
   const preview = dialog.querySelector('#roster-preview');
   let side = 0;
   let candidate;
+  let selectedSkill = 0, previewStart = 0, animation = 0;
+  const ctx = portrait.getContext('2d');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  let playOnce = false;
+  function showPreview(time) {
+    if (!dialog.open || !candidate) return;
+    const skill = candidate.signatures[selectedSkill];
+    const elapsed = Math.max(0, Math.floor((time - previewStart) * .06));
+    const tick = reduced.matches ? (playOnce ? elapsed : skill.end + 1) : elapsed % (skill.end + 62);
+    const move = tick <= skill.end ? { id: 'signature', skill, age: tick } : null;
+    ctx.clearRect(0, 0, portrait.width, portrait.height);
+    ctx.save(); ctx.translate(124, 228); ctx.scale(1.19, 1.19);
+    ctx.fillStyle = '#211b1d80'; ctx.beginPath(); ctx.ellipse(0, 1, 44, 7, 0, 0, 2 * Math.PI); ctx.fill();
+    const drawn = drawActor(ctx, { character: candidate, move, y: 0, pose: 'idle' }, reduced.matches ? tick : elapsed, MOVES);
+    if (drawn) portrait.dataset.ready = 'true';
+    for (const [i, beat] of skill.steps.entries()) {
+      const age = (tick - beat.at) / 15;
+      if (age >= 0 && age < 1) drawStrike(ctx, { x:0, y:-82, span:105, family:skill.effect, color:candidate.color,
+        slot:selectedSkill, kind:beat.kind, last:i===skill.steps.length-1, frame:beat.at, facing:1 }, age);
+    }
+    ctx.restore();
+    animation = requestAnimationFrame(showPreview);
+  }
+  function selectSkill(index, manual = false) {
+    selectedSkill = index;
+    playOnce = manual;
+    previewStart = performance.now();
+    dialog.querySelectorAll('[data-preview]').forEach((b,i) => b.setAttribute('aria-pressed', i === index));
+    cancelAnimationFrame(animation);
+    animation = requestAnimationFrame(showPreview);
+  }
 
   const observer = new IntersectionObserver(records => {
     for (const record of records) {
@@ -20,24 +54,33 @@ export function setupRosterPicker({ selection, mode, confirm }) {
     }
   }, { root: list, rootMargin: '80px' });
 
-  team.add(new Option('全部队伍', ''));
-  TEAMS.forEach(group => team.add(new Option(group.name, group.id)));
+  team.add(new Option('全部势力', ''));
+  for (const kingdom of new Set(TEAMS.map(group => group.kingdom))) team.add(new Option(kingdom, kingdom));
 
   const updatePreview = character => {
     candidate = character;
     preview.style.setProperty('--roster-accent', character.color);
     dialog.querySelector('#roster-name').textContent = character.name;
     dialog.querySelector('#roster-style').textContent = character.roman + ' · ' + character.family + ' / ' + character.style;
-    dialog.querySelector('#roster-skills').replaceChildren(...character.signatures.map(skill => {
+    dialog.querySelector('#roster-skills').replaceChildren(...character.signatures.map((skill, i) => {
       const line = document.createElement('li');
+      const play = document.createElement('button');
+      play.type = 'button';
+      play.dataset.preview = i;
+      play.setAttribute('aria-label', '演示' + skill.name);
+      play.onclick = () => selectSkill(i, true);
       const name = document.createElement('strong');
       const detail = document.createElement('span');
       name.textContent = skill.name;
       detail.textContent = skill.description + ' · ' + skill.steps.length + '段' + (skill.cost ? ' · ' + skill.cost + ' 能量' : '');
-      line.append(name, detail);
+      play.append(name, detail);
+      line.append(play);
       return line;
     }));
-    drawPortrait(portrait, character);
+    portrait.dataset.character = character.id;
+    delete portrait.dataset.ready;
+    preloadFighter(character).catch(() => { if (candidate === character) portrait.dataset.ready = 'error'; });
+    selectSkill(0);
     list.querySelectorAll('[data-character]').forEach(button => {
       button.setAttribute('aria-pressed', button.dataset.character === character.id);
     });
@@ -45,9 +88,10 @@ export function setupRosterPicker({ selection, mode, confirm }) {
 
   function renderList() {
     observer.disconnect();
-    const query = search.value.trim().toLowerCase();
-    const fighters = ROSTER.filter(character => (!team.value || character.team === team.value)
-      && (!query || (character.name + ' ' + character.roman + ' ' + character.family + ' ' + character.style).toLowerCase().includes(query)));
+    const normalize = text => text.toLowerCase().replaceAll('ü', 'u').replaceAll('lv', 'lu').replace(/\s+/g, '');
+    const query = normalize(search.value);
+    const fighters = ROSTER.filter(character => (!team.value || character.kingdom === team.value)
+      && (!query || [character.name, character.roman, character.family, character.style].some(text => normalize(text).includes(query))));
     list.innerHTML = fighters.length ? fighters.map(character =>
       '<button class="fighter-card" type="button" data-character="' + character.id + '" aria-pressed="' + (candidate?.id === character.id)
       + '" style="--roster-accent:' + character.color + '"><canvas width="112" height="90" data-id="' + character.id
@@ -83,7 +127,7 @@ export function setupRosterPicker({ selection, mode, confirm }) {
     dialog.close();
   };
   dialog.querySelector('#roster-close').onclick = () => dialog.close();
-  dialog.addEventListener('close', () => observer.disconnect());
+  dialog.addEventListener('close', () => { observer.disconnect(); cancelAnimationFrame(animation); });
   document.querySelectorAll('[data-pick]').forEach(button => {
     button.onclick = () => {
       team.value = '';

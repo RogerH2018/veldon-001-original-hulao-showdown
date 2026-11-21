@@ -1,109 +1,86 @@
 const tau = Math.PI * 2;
-const shapes = {
-  arc: 'ring', flare: 'embers', wave: 'ring', bolt: 'lightning', bloom: 'petals',
-  prism: 'shards', ink: 'trail', dust: 'embers', gear: 'shards', note: 'ring',
+const aspect = {
+  dragon: '龍', tiger: '虎', flame: '火', wind: '風', moon: '月', sun: '日', petal: '花', bell: '音',
+  stone: '山', sand: '沙', feather: '羽', ice: '霜', water: '潮', stars: '星', leaf: '木', ink: '墨', storm: '雷',
 };
-
-function slash(ctx, x, y, sx, sy, tilt, color, alpha) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(tilt);
-  ctx.scale(sx, sy);
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(-50, 22);
-  ctx.bezierCurveTo(-14, -63, 44, -45, 79, 5);
-  ctx.bezierCurveTo(41, -21, -12, -29, -50, 22);
-  ctx.fill();
-  ctx.strokeStyle = '#fff7e8';
-  ctx.lineWidth = 1.8;
-  ctx.beginPath();
-  ctx.moveTo(-42, 3);
-  ctx.bezierCurveTo(-7, -46, 39, -42, 65, -9);
-  ctx.stroke();
-  ctx.restore();
+function path(ctx, points, color, width) {
+  ctx.beginPath(); points.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.stroke();
 }
-
+function cut(ctx, r, width, turn) {
+  ctx.save(); ctx.rotate(turn); ctx.beginPath();
+  ctx.moveTo(-r * .57, r * .52);
+  ctx.bezierCurveTo(-r * .25, -r * .94, r * .65, -r * .83, r, r * .08);
+  ctx.bezierCurveTo(r * .57, -r * .50 - width, -r * .20, -r * .63, -r * .57, r * .52);
+  ctx.fill(); ctx.restore();
+}
+function motif(ctx, family, r, phase, color) {
+  ctx.strokeStyle = color; ctx.lineWidth = 2.3; ctx.fillStyle = color;
+  if (family === 'dragon' || family === 'water' || family === 'wind' || family === 'ink') {
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath(); ctx.moveTo(-r * .95, r * .2 + i * 7);
+      ctx.bezierCurveTo(-r * .4, -r * (1.3 - i * .16), r * .3, r * .7, r, -r * .56 + i * 5);
+      ctx.stroke();
+    }
+    if (family === 'dragon') {
+      path(ctx, [[r * .78,-r * .40],[r * .83,-r * .67],[r * .9,-r * .52],[r * 1.05,-r * .59],[r,-r * .40]], color, 3.5);
+    }
+  } else if (family === 'stars' || family === 'storm' || family === 'ice') {
+    const star = family === 'stars';
+    const vertices = Array.from({ length: 7 }, (_, i) => [(i - 3) * r * .30, Math.sin(i * 3.72 + phase * .5) * r * .55]);
+    path(ctx, vertices, color, star ? 1.5 : 3.5);
+    for (const [x,y] of vertices) {ctx.fillRect(x-2, y-2, star ? 4 : 2, star ? 4 : 7);}
+  } else if (family === 'tiger') {
+    for (let i = -1; i <= 1; i++) {ctx.save(); ctx.translate(i * 13, i * 5); cut(ctx, r * .7, 7, -.65); ctx.restore();}
+  } else if (['sun', 'moon', 'bell'].includes(family)) {
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath(); ctx.ellipse(0, 0, r * (.45+i*.19), r * (.38+i*.17), -.39, .25, family === 'moon' ? 4.5 : tau); ctx.stroke();
+    }
+  }
+}
 export function drawStrike(ctx, event, age) {
-  const fade = (1 - age) ** 1.2;
-  const force = event.last ? 1.45 : 1;
-  const palette = event.color;
-  const x = Math.max(26, event.span * 0.63);
-  const pattern = shapes[event.family];
-  ctx.save();
-  ctx.translate(event.x, event.y);
-  ctx.scale(event.facing, 1);
-  ctx.globalCompositeOperation = 'screen';
-
-  if (event.last) {
-    const glow = ctx.createRadialGradient(x, 0, 8, x, 0, 106 * force);
-    glow.addColorStop(0, palette + 'c8');
-    glow.addColorStop(1, palette + '00');
-    ctx.globalAlpha = fade * 0.72;
-    ctx.fillStyle = glow;
-    ctx.fillRect(x - 170, -170, 340, 340);
-  }
-  if (event.kind === 'pulse' || event.kind === 'burst') {
-    ctx.globalAlpha = fade;
-    ctx.fillStyle = palette;
-    ctx.shadowColor = palette;
-    ctx.shadowBlur = event.last ? 22 : 11;
-    ctx.beginPath();
-    ctx.moveTo(19, 5);
-    ctx.quadraticCurveTo(x * 0.66, -35 * force, event.span, 0);
-    ctx.quadraticCurveTo(x * 0.8, 23 * force, 19, 5);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = '#fff9e8';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(24, 4);
-    ctx.lineTo(event.span, 0);
-    ctx.stroke();
+  if (age < 0 || age >= 1) return;
+  const { kind, family, color, last, slot } = event;
+  const scale = last ? 1.17 : slot < 0 ? .72 : .94;
+  const fade = (1 - age) ** 1.16, span = Math.max(55, event.span);
+  ctx.save(); ctx.translate(event.x, event.y); ctx.scale(event.facing, 1); ctx.lineCap = 'round';
+  ctx.globalAlpha = fade;
+  const beam = ['volley', 'thrust', 'rush', 'cast', 'burst'].includes(kind);
+  ctx.fillStyle = color;
+  if (beam) {
+    const start = 26 + age * 21, end = span + (slot < 0 ? 0 : age * 11);
+    const mid = (start + end) / 2, thick = kind === 'burst' ? 23 : kind === 'cast' ? 12 : 6;
+    ctx.beginPath(); ctx.moveTo(start, 5);
+    ctx.quadraticCurveTo(mid, -thick, end, kind === 'volley' ? -11 : -2);
+    ctx.quadraticCurveTo(mid, thick, start, 5); ctx.fill();
+    path(ctx, [[start+8,3],[mid,0],[end,-3]], '#fff5d8', 2.4);
+    if (kind === 'volley') for (const offset of [-12,12]) path(ctx, [[mid-13,offset],[end-5,offset-9],[end-11,offset-13]], color, 2);
   } else {
-    const tilt = { jab: -0.08, hook: 0.4, cleave: 0.81, rush: -0.13, lift: -0.9, drop: 0.92, cross: -0.33 }[event.kind] ?? 0;
-    slash(ctx, x, event.kind === 'lift' ? -30 : 0, force + age * 0.15, force * 0.87, tilt, palette, fade);
-    if (event.slot || event.last) slash(ctx, x - 11, 17, 0.92 * force, 0.67 * force, tilt - 0.23, palette, fade * 0.58);
+    ctx.save(); ctx.translate(span*.64, kind === 'rise' ? -17 : 2);
+    const tilt = { cut: .2, rise: -1.05, sweep: -.19, crush: 1.15, dive: 1.34, spin: -.55, kick: -.25 }[kind] ?? 0;
+    cut(ctx, (65 + age * 14) * scale, 11, tilt + age * .23);
+    ctx.fillStyle = '#fff4cf'; cut(ctx, (54 + age * 13) * scale, 3, tilt - .15 + age * .23);
+    if (kind === 'spin' || last) {ctx.fillStyle=color; cut(ctx, 58*scale, 8, tilt+2.7);}
+    ctx.restore();
   }
-
-  ctx.translate(x, 0);
-  ctx.globalAlpha = fade * 0.8;
-  ctx.strokeStyle = palette;
-  ctx.fillStyle = palette;
-  ctx.lineWidth = event.last ? 3.5 : 2;
-  if (pattern === 'ring') {
-    for (let index = 0; index < 3; index++) {
-      const radius = 26 + age * 72 + index * 11;
-      ctx.beginPath();
-      ctx.ellipse(0, 0, radius, radius * (event.family === 'wave' ? 0.35 : 0.71), -0.2, 0, tau);
-      ctx.stroke();
-    }
+  ctx.translate(span * .83, -3);
+  const radius = (37 + age * 60) * scale;
+  if (slot >= 0) motif(ctx, family, radius, age, color);
+  const count = last ? 23 : slot < 0 ? 5 : 11;
+  for (let i = 0; i < count; i++) {
+    const angle = i * 2.4 + event.frame * .11;
+    const distance = (11 + age * (40 + i % 5 * 11)) * scale;
+    const x = Math.cos(angle) * distance, y = Math.sin(angle) * distance - age * (family === 'flame' ? 33 : 4);
+    ctx.fillStyle = i % 3 ? color : '#fff5d2';
+    ctx.beginPath(); ctx.ellipse(x, y, (family === 'petal' || family === 'leaf' || family === 'feather' ? 6 : 3.5) * scale,
+      1.8 * scale, angle + age, 0, tau); ctx.fill();
   }
-  const count = event.last ? 28 : 13;
-  for (let index = 0; index < count; index++) {
-    const angle = index * 2.399 + event.frame * 0.17;
-    const distance = (15 + age * (43 + index % 7 * 12)) * force;
-    const dx = Math.cos(angle) * distance;
-    const dy = Math.sin(angle) * distance * 0.83;
-    const size = (2 + index % 5) * force;
-    ctx.beginPath();
-    if (pattern === 'shards' || pattern === 'petals') {
-      ctx.moveTo(dx, dy - size * 1.6);
-      ctx.lineTo(dx + size, dy + 2);
-      ctx.lineTo(dx, dy + size);
-      ctx.lineTo(dx - size / 2, dy);
-      ctx.fill();
-    } else if (pattern === 'lightning') {
-      ctx.moveTo(dx * 0.4, dy * 0.4);
-      ctx.lineTo(dx * 0.74 + 4, dy * 0.71 - 7);
-      ctx.lineTo(dx * 0.8 - 6, dy * 0.8 + 2);
-      ctx.lineTo(dx, dy);
-      ctx.stroke();
-    } else {
-      ctx.ellipse(dx, dy, size * (pattern === 'trail' ? 2.8 : 1.1), size * 0.53, angle, 0, tau);
-      ctx.fill();
-    }
+  if (last && slot === 2) {
+    ctx.scale(event.facing,1); ctx.translate(0, -79 - age * 12); ctx.rotate(-.09);
+    ctx.fillStyle = '#762c21'; ctx.fillRect(-17,-17,34,34);
+    ctx.strokeStyle = '#efca89'; ctx.lineWidth = 1; ctx.strokeRect(-15,-15,30,30);
+    ctx.fillStyle = '#fff0bc'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.font='bold 26px KaiTi, STKaiti, serif'; ctx.fillText(aspect[family] ?? '武', 0, 1);
   }
   ctx.restore();
 }

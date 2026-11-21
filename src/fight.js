@@ -1,5 +1,6 @@
-import { PORT } from './input.js?v=2';
-import { DEFAULT_ROSTER, findFighter } from './roster.js';
+import { PORT } from './input.js?v=3';
+import { DEFAULT_ROSTER, findFighter } from './roster.js?v=3';
+import { basicStroke } from './motion.js?v=3';
 
 export const WIDTH = 1200;
 export const HEIGHT = 640;
@@ -8,17 +9,33 @@ export const TICKS = 60;
 export const ROUND_SECONDS = 55;
 
 export const MOVES = {
-  A: { active: 5, end: 13, reach: 97, damage: 5, stun: 11, drive: 0.4 },
-  B: { active: 10, end: 24, reach: 127, damage: 9, stun: 17, drive: 2.1 },
-  C: { active: 19, end: 39, reach: 120, damage: 13, stun: 23, drive: 0.9, breaker: true },
-  D: { active: 13, end: 32, reach: 153, damage: 11, stun: 19, drive: 0.5 },
-  dash: { active: 11, end: 28, reach: 108, damage: 12, stun: 21, drive: 6.8 },
-  pivot: { active: 15, end: 28, reach: 149, damage: 12, stun: 18, drive: -3.5 },
+  A: { tactic: 'quick', active: 5, end: 17, reach: 97, damage: 5, stun: 11, drive: 0.4 },
+  B: { tactic: 'charge', active: 10, end: 25, reach: 127, damage: 9, stun: 17, drive: 2.1 },
+  C: { tactic: 'break', active: 19, end: 39, reach: 120, damage: 13, stun: 23, drive: 0.9, breaker: true },
+  D: { tactic: 'antiAir', active: 13, end: 32, reach: 153, damage: 11, stun: 19, drive: 0.5 },
+  dash: { tactic: 'charge', active: 11, end: 28, reach: 108, damage: 12, stun: 21, drive: 6.8 },
+  pivot: { tactic: 'quick', active: 15, end: 28, reach: 149, damage: 12, stun: 18, drive: -3.5 },
   surge: { active: 13, end: 37, reach: 0, damage: 16, stun: 24, drive: 0, cost: 40 },
 };
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const attackButtons = ['D', 'C', 'B', 'A'];
+const beats = { quick: 'break', charge: 'quick', break: 'charge' };
+const counterNames = { quick: '快击截破', charge: '突进抢快', break: '重破拦突' };
+
+function windup(fighter) {
+  const action = fighter.move;
+  if (!action || action.failedAt !== undefined) return null;
+  const move = action.skill ?? MOVES[action.id];
+  const active = action.skill?.steps[0].at ?? move.active;
+  if (!move.tactic || action.age > active) return null;
+  return { tactic: move.tactic, remaining: active - action.age, reach: move.reach + fighter.character.reach };
+}
+
+function advantage(tactic, other, airborne) {
+  if (tactic === 'antiAir' && airborne) return '对空迎击';
+  return other && beats[tactic] === other ? counterNames[tactic] : null;
+}
 
 function makeFighter(id, character, wins = 0) {
   return {
@@ -122,10 +139,13 @@ export class Fight {
         if (action.id === 'surge') {
           this.projectiles.push({ id: fighter.id, x: fighter.x + fighter.facing * 56, y: fighter.y + 74, facing: fighter.facing });
           this.onEvent('surge', fighter.id);
-        } else if (fighter.facing * (target.x - fighter.x) > 0
-          && Math.abs(fighter.x - target.x) <= move.reach + fighter.character.reach
-          && Math.abs(fighter.y - target.y) <= 96) {
-          contacts.push({ fighter, target, move, blocked: target.guard && !move.breaker });
+        } else {
+          this.strikeEffect(fighter, basicStroke(fighter.character.weapon, action.id), move.reach, -1, false);
+          if (fighter.facing * (target.x - fighter.x) > 0
+            && Math.abs(fighter.x - target.x) <= move.reach + fighter.character.reach
+            && Math.abs(fighter.y - target.y) <= (move.tactic === 'antiAir' ? 176 : 96)) {
+            contacts.push({ fighter, target, move, tactic: move.tactic, blocked: target.guard && !move.breaker });
+          }
         }
       }
       if (action.age >= move.end) fighter.move = null;
@@ -139,7 +159,7 @@ export class Fight {
       }
       return projectile.x >= 0 && projectile.x <= WIDTH;
     });
-    contacts.forEach(contact => this.land(contact));
+    this.resolveContacts(contacts);
     if (this.clock === 0 || this.fighters.some(fighter => fighter.hp === 0)) this.endRound();
   }
 
@@ -180,7 +200,7 @@ export class Fight {
         const last = action.skill.steps.at(-1);
         if (action.age < first.at || (action.confirmed && action.age < last.at)) {
           const gap = fighter.facing * (other.x - fighter.x);
-          fighter.x += fighter.facing * clamp(gap - 75, 0, action.skill.drive);
+          fighter.x += fighter.facing * clamp(gap - 104, 0, action.skill.drive);
         }
       } else {
         const move = MOVES[action.id];
@@ -208,7 +228,7 @@ export class Fight {
     fighter.energy -= MOVES[id].cost ?? 0;
     fighter.move = { id, age: 0 };
     fighter.pose = 'attack';
-    this.onEvent('swing', fighter.id);
+    this.onEvent('swing', { id: fighter.id, weapon: fighter.character.weapon, kind: basicStroke(fighter.character.weapon, id) });
   }
 
   requestSignature(id, slot) {
@@ -217,7 +237,7 @@ export class Fight {
     if (this.phase !== 'fight' || !skill || fighter.stun || fighter.y > 65) return 'busy';
     if (fighter.energy < skill.cost) return 'energy';
     if (fighter.move) {
-      const end = fighter.move.skill?.end ?? MOVES[fighter.move.id].end;
+      const end = fighter.move.failedAt !== undefined ? fighter.move.failedAt + 12 : fighter.move.skill?.end ?? MOVES[fighter.move.id].end;
       if (end - fighter.move.age > 12) return 'busy';
       fighter.pending = { slot, until: this.frame + 13 };
       return 'queued';
@@ -227,7 +247,7 @@ export class Fight {
     fighter.pose = 'attack';
     fighter.directions = [];
     fighter.signatureBanner = { name: skill.name, hits: 0, max: skill.steps.length, until: this.frame + skill.end + 40 };
-    this.onEvent('signature', { id, skill });
+    this.onEvent('signature', { id, skill, weapon: fighter.character.weapon });
     return 'started';
   }
 
@@ -240,46 +260,87 @@ export class Fight {
       const inRange = gap > 0 && gap <= skill.reach + fighter.character.reach
         && Math.abs(fighter.y - target.y) <= (skill.slot === 2 ? 138 : 104);
       const last = action.next === skill.steps.length - 1;
-      this.effects.push({
-        type: 'strike', id: fighter.id, color: fighter.character.color, family: skill.effect,
-        kind: beat.kind, slot: skill.slot, x: fighter.x, span: skill.slot === 2 ? Math.min(skill.reach, Math.max(115, gap)) : 126, y: GROUND - fighter.y - 92,
-        facing: fighter.facing, frame: this.frame, duration: last ? 22 : 12, last,
-      });
+      this.strikeEffect(fighter, beat.kind, Math.min(skill.reach, Math.max(108, gap)), skill.slot, last);
       if (inRange || !first) {
         contacts.push({
           fighter, target, action,
           move: { damage: beat.damage, stun: last ? 22 : skill.steps[action.next + 1].at - beat.at + 7, push: beat.push },
-          blocked: first && target.guard, skill, beat, last,
+          blocked: first && target.guard, tactic: first ? skill.tactic : undefined, skill, beat, last,
         });
       } else {
+        action.failedAt = action.age;
         fighter.signatureBanner.result = '未命中';
         this.onEvent('miss', fighter.id);
       }
       action.next++;
     }
-    if (action.age >= skill.end) fighter.move = null;
+    if (action.age >= (action.failedAt === undefined ? skill.end : action.failedAt + 12)) fighter.move = null;
+  }
+
+  strikeEffect(fighter, kind, span, slot, last) {
+    this.effects.push({ type: 'strike', id: fighter.id, color: fighter.character.color, family: fighter.character.effect,
+      kind, slot, x: fighter.x, span, y: GROUND - fighter.y - 99, facing: fighter.facing, frame: this.frame,
+      duration: last ? 24 : slot < 0 ? 11 : 15, last });
+  }
+
+  resolveContacts(contacts) {
+    // Decide priority from the same pre-impact state on both sides. Equal classes trade.
+    const stopped = new Map();
+    for (const contact of contacts) {
+      const { fighter, target, tactic } = contact;
+      if (!tactic || contact.blocked) continue;
+      const defending = windup(target);
+      contact.counter = fighter.move?.counterReady || advantage(tactic, defending?.tactic, target.y > 12);
+      if (contact.counter || !defending || defending.remaining > 5) continue;
+      const reply = advantage(defending.tactic, tactic, fighter.y > 12);
+      const gap = target.facing * (fighter.x - target.x);
+      const height = defending.tactic === 'antiAir' ? 176 : 96;
+      if (reply && gap > 0 && gap <= defending.reach && Math.abs(fighter.y - target.y) <= height) {
+        stopped.set(contact, reply);
+      }
+    }
+    for (const [contact, reply] of stopped) {
+      const { fighter, target } = contact;
+      target.move.counterReady = reply;
+      if (fighter.move?.skill) fighter.signatureBanner.result = '被克制';
+      fighter.move = null;
+      fighter.pending = null;
+      fighter.stun = 6;
+      fighter.pose = 'hurt';
+    }
+    for (const contact of contacts) {
+      if (!stopped.has(contact)) this.land(contact);
+    }
   }
 
   separate(first, second) {
     if (Math.abs(first.y - second.y) > 95) return;
     const [left, right] = first.x < second.x ? [first, second] : [second, first];
-    const overlap = 72 - (right.x - left.x);
+    const gap = 94;
+    const overlap = gap - (right.x - left.x);
     if (overlap <= 0) return;
-    left.x = clamp(left.x - overlap / 2, 71, WIDTH - 143);
-    right.x = left.x + 72;
+    left.x = clamp(left.x - overlap / 2, 71, WIDTH - 71 - gap);
+    right.x = left.x + gap;
   }
 
-  land({ fighter, target, move, blocked, action, skill, beat, last = false }) {
-    const damage = blocked ? 0 : Math.round(move.damage * fighter.character.weight);
+  land({ fighter, target, move, blocked, action, skill, beat, counter, last = false }) {
+    const guardBreak = move.breaker && target.guard;
+    const damage = blocked ? 0 : Math.round(move.damage * fighter.character.weight * (counter ? 1.25 : 1));
+    if (counter || guardBreak) {
+      fighter.counterBanner = { name: counter || '破防', until: this.frame + 49 };
+      this.effects.push({ type: 'counter', text: fighter.counterBanner.name, x: target.x, y: GROUND - target.y - 185,
+        frame: this.frame, duration: 38, id: fighter.id, color: fighter.character.color });
+      this.onEvent('counter', { id: fighter.id, weapon: fighter.character.weapon });
+    }
     if (action && !blocked) {
       action.confirmed = true;
       fighter.signatureBanner.hits++;
-      this.onEvent('signatureHit', { id: fighter.id, skill, beat, last });
+      this.onEvent('signatureHit', { id: fighter.id, skill, beat, last, weapon: fighter.character.weapon });
     }
-    if (action && blocked) fighter.signatureBanner.result = '被防住';
+    if (action && blocked) { action.failedAt = action.age; fighter.signatureBanner.result = '被防住'; }
     if (target.move?.skill && target.signatureBanner) target.signatureBanner.result = '被打断';
     target.hp = Math.max(0, target.hp - damage);
-    target.stun = blocked ? 8 : move.stun;
+    target.stun = blocked ? 8 : move.stun + (counter ? 5 : 0);
     target.pose = blocked ? 'guard' : 'hurt';
     target.move = null;
     target.pending = null;
@@ -332,6 +393,10 @@ export class Opponent {
       this.nextSignature = fight.frame + (level === 2 ? 295 : 210);
       fight.requestSignature(1, slot);
       this.intent = [];
+    } else if (level === 3 && gap < 140 && human.y > 15) this.intent = [PORT.D];
+    else if (level === 3 && gap < 128 && windup(human)) {
+      const response = { break: PORT.A, quick: PORT.B, charge: PORT.C }[windup(human).tactic];
+      this.intent = response === undefined ? [away] : [response];
     } else if (level > 1 && human.move && gap < 155 && human.move.id !== 'C') this.intent = [away];
     else if (gap > 145) this.intent = [toward];
     else {

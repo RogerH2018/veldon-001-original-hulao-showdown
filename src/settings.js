@@ -1,10 +1,11 @@
-import { ACTIONS, DEFAULT_BINDINGS, DEFAULT_MACROS, compileCombo, keyName, normalizeKey } from './input.js?v=2';
-import { DEFAULT_ROSTER, findFighter } from './roster.js';
+import { ACTIONS, DEFAULT_BINDINGS, DEFAULT_MACROS, compileCombo, keyName, normalizeKey } from './input.js?v=3';
+import { DEFAULT_ROSTER, findFighter } from './roster.js?v=3';
 
 const $ = selector => document.querySelector(selector);
-const storageKey = 'veldon.arc-harbor.v1';
+const storageKey = 'veldon.hulao.v1';
+const legacyMacroNames = ['迎潮', '回流', '放电'];
 const reserved = new Set(['Escape', 'Enter', 'Tab', 'MetaLeft', 'MetaRight', 'AltLeft', 'AltRight', 'ControlLeft', 'ControlRight']);
-export const labels = { up: '上', left: '左', down: '下', right: '右', A: '轻击', B: '进击', C: '破防', D: '脉冲' };
+export const labels = { up: '上', left: '左', down: '下', right: '右', A: '快击', B: '突进', C: '重破', D: '上挑' };
 const defaults = () => ({
   mode: 'cpu', difficulty: 2, sound: true,
   roster: [...DEFAULT_ROSTER],
@@ -41,7 +42,7 @@ export function validateSettings(config) {
 
 export function loadSettings() {
   try {
-    const saved = migrateSettings(JSON.parse(localStorage.getItem(storageKey)));
+    const saved = migrateSettings(JSON.parse(localStorage.getItem(storageKey) ?? localStorage.getItem('veldon.arc-harbor.v1')));
     validateSettings(saved);
     return saved;
   } catch {
@@ -53,9 +54,12 @@ export function migrateSettings(saved) {
   if (!saved) return defaults();
   saved.roster = DEFAULT_ROSTER.map((id, player) => findFighter(saved.roster?.[player])?.id ?? id);
   saved.macros.forEach((slots, player) => slots.forEach((slot, index) => {
-    if (slot.source !== undefined) return;
     const previous = DEFAULT_MACROS[player][index];
-    slot.source = ['name', 'sequence', 'gap'].some(field => slot[field] !== previous[field]) ? 'custom' : 'signature';
+    if (slot.source === undefined) {
+      const renamed = ![previous.name, legacyMacroNames[index]].includes(slot.name);
+      slot.source = renamed || slot.sequence !== previous.sequence || slot.gap !== previous.gap ? 'custom' : 'signature';
+    }
+    if (slot.source === 'signature' && slot.name === legacyMacroNames[index]) slot.name = previous.name;
   }));
   return saved;
 }

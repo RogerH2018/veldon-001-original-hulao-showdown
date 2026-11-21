@@ -1,10 +1,10 @@
-import { Fight, Opponent, ROUND_SECONDS, TICKS } from './fight.js?v=2';
-import { ACTIONS, MacroPlayer, PORT, keyName, normalizeKey } from './input.js?v=2';
-import { createRenderer } from './render.js?v=2';
-import { FightSound } from './sound.js?v=2';
-import { loadSettings, saveSettings, setupSettings, labels } from './settings.js?v=2';
-import { preloadFighter } from './art.js';
-import { setupRosterPicker } from './picker.js';
+import { Fight, Opponent, ROUND_SECONDS, TICKS } from './fight.js?v=3';
+import { ACTIONS, MacroPlayer, PORT, keyName, normalizeKey } from './input.js?v=3';
+import { createRenderer, preloadStage } from './render.js?v=3';
+import { FightSound } from './sound.js?v=3';
+import { loadSettings, saveSettings, setupSettings, labels } from './settings.js?v=3';
+import { preloadFighter } from './art.js?v=3';
+import { setupRosterPicker } from './picker.js?v=3';
 
 const $ = selector => document.querySelector(selector);
 const dialog = $('#preferences');
@@ -30,6 +30,7 @@ const fight = new Fight((event, id) => {
     renderTouch();
     status('开始对战');
   }
+  if (event === 'counter') status(fight.fighters[id.id].character.name + '打出了克制');
   if (event === 'match') status(fight.selection[id].name + '获胜');
 }, settings.roster);
 const render = createRenderer($('#arena'));
@@ -81,7 +82,7 @@ function updateDecks() {
   $('#decks').innerHTML = fight.selection.map((fighter, index) => {
     const auto = index === 1 && settings.mode === 'cpu';
     const group = actions => actions.map(action => '<span title="' + labels[action] + '"><kbd></kbd><small>'
-      + (arrows[action] ?? action) + '</small></span>').join('');
+      + (arrows[action] ?? labels[action]) + '</small></span>').join('');
     return '<article class="deck deck-' + index + '" style="--accent:' + fighter.color + '" data-deck="' + index + '"><div class="deck-title"><b>'
       + (auto ? 'CPU' : (index + 1) + 'P') + '</b><strong>' + fighter.name + '</strong><span>' + fighter.style + '</span></div>'
       + (auto ? '<p class="cpu-note">电脑难度 · ' + ['入门', '标准', '进阶'][settings.difficulty - 1] + '</p>'
@@ -149,7 +150,7 @@ async function start() {
   refresh();
   audio.unlock();
   try {
-    await Promise.all(fight.selection.map(preloadFighter));
+    await Promise.all([preloadStage(), ...fight.selection.map(preloadFighter)]);
   } catch {
     $('#load-error').hidden = false;
     status('角色美术加载失败，请刷新后重试。');
@@ -266,6 +267,11 @@ function triggerSignature(player, slot) {
   const result = fight.requestSignature(player, slot);
   const fighter = fight.fighters[player];
   if (result === 'started') macros[player].cancel();
+  if (result === 'busy' || result === 'queued') {
+    const text = result === 'queued' ? '已预输入' : fighter.stun ? '受击硬直中' : fighter.y > 65 ? '落地后出招' : '招式进行中';
+    fighter.inputNotice = { text, until: fight.frame + 34 };
+    status(text);
+  }
   if (result === 'energy') {
     const skill = fighter.character.signatures[slot];
     if (!fighter.move?.skill) {
@@ -339,7 +345,7 @@ const fighterPanel = (fighter, id) => '<article class="fighter deck-' + id + '">
   + '</b><span>' + fighter.roman + '</span><small' + (id ? ' id="opponent-label"' : '') + '>' + (id ? 'CPU' : '1P') + '</small></div>'
   + '<div class="health" role="progressbar" aria-label="' + fighter.name + '生命" aria-valuemin="0" aria-valuemax="100"><span></span></div>'
   + '<div class="charge" role="progressbar" aria-label="' + fighter.name + '能量" aria-valuemin="0" aria-valuemax="100"><span></span></div>'
-  + '<div class="wins"><i></i><i></i></div><span class="hits"></span></article>';
+  + '<div class="wins"><i></i><i></i></div><span class="hits"></span><span class="counter-call"></span></article>';
 $('#hud').innerHTML = fighterPanel(fight.selection[0], 0) + '<div class="clock"><b id="timer">' + ROUND_SECONDS
   + '</b><span id="round">第 1 局</span></div>' + fighterPanel(fight.selection[1], 1);
 const panels = [...document.querySelectorAll('.fighter')];
@@ -362,6 +368,8 @@ function updateHud() {
       bar.setAttribute('aria-valuenow', value);
     }
     panel.querySelectorAll('.wins i').forEach((marker, index) => marker.classList.toggle('won', index < fighter.wins));
+    panel.querySelector('.counter-call').textContent = fighter.counterBanner?.until > fight.frame ? fighter.counterBanner.name
+      : fighter.inputNotice?.until > fight.frame ? fighter.inputNotice.text : '';
     const banner = fighter.signatureBanner;
     panel.querySelector('.hits').textContent = banner
       ? banner.name + ' · ' + (banner.result ?? (banner.hits ? banner.hits + '/' + banner.max + ' 命中' : '起手'))
