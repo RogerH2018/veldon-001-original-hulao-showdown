@@ -1,6 +1,12 @@
+<p align="center"><img src="assets/veldon-game.png" width="80" height="80" alt="Veldon Game"></p>
+
+**简体中文** · [English](README.en.md)
+
 # 三国小将·虎牢争锋
 
-Veldon 第 001 款自制网页格斗游戏。关羽横刀，吕布挺戟，百位 Q 版三国人物在虎牢关前交锋。支持单人挑战电脑、双人同屏和触屏操作。[网页试玩](https://rogerh2018.github.io/veldon-001-original-hulao-showdown/)
+Veldon 第 001 款自制网页格斗游戏。关羽横刀，吕布挺戟，百位 Q 版三国人物在虎牢关前交锋。支持单人挑战电脑、双人同屏和触屏操作。[网页试玩](https://rogerh2018.github.io/veldon-001-original-hulao-showdown/?lang=zh)
+
+初次进入时游戏会读取浏览器语言偏好。点右上角的 **English / 简体中文** 可随时切换，浏览器会记住选择。点将台、招式名称、触屏按键、克制提示与连招编辑器都支持两种语言。
 
 ## 点将与演武
 
@@ -40,8 +46,12 @@ npm run dev
 npm test
 ~~~
 
-浏览器直接加载静态模块。包清单有零个第三方依赖。战鼓、铜锣、拨弦和箫声由 Web Audio 合成。
+启动后在浏览器打开终端显示的本地地址，默认是 `http://127.0.0.1:4173/`。浏览器直接加载静态模块。包清单有零个第三方依赖。战鼓、铜锣、拨弦和箫声由 Web Audio 合成。
 
 ## 制作
 
-100 位武将各有独立衣甲、四个具名基础招式及三套专属连招。双手、肩肘、膝踝和两脚随各自的动作谱分开运动。兵刃轨迹跟随握点，弓弦、双剑与琴弦各有自己的双手姿势。头像、身体部件、主要兵器与虎牢关背景使用 ImageGen 绘制，随游戏本地加载。[头像、兵器与背景](assets/roster/PROMPTS.md) · [衣甲与四肢](assets/rig/PROMPTS.md) · [Veldon Game](https://github.com/RogerH2018/Veldon-Game)
+100 位武将各有独立衣甲、四个具名基础招式及三套专属连招。双手、肩肘、膝踝和两脚随各自的动作谱分开运动。兵刃轨迹跟随握点，弓弦、双剑与琴弦各有自己的双手姿势。手腕从袖口自然伸出，短靴在踏步和落地时由脚跟向前掌过渡。头像、身体部件、主要兵器与虎牢关背景使用 ImageGen 绘制，随游戏本地加载。品牌图标取自 Veldon Game 主项目。[头像、兵器与背景](assets/roster/PROMPTS.md) · [衣甲与四肢](assets/rig/PROMPTS.md) · [Veldon Game](https://github.com/RogerH2018/Veldon-Game)
+
+## 许可证
+
+© 2026 Veldon Game。本项目采用 MIT 许可证，使用或分发时请保留版权声明和许可证文本。[MIT 许可证全文](LICENSE)

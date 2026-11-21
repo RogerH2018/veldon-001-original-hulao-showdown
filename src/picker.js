@@ -1,9 +1,9 @@
-import { CONTROL_NAMES } from './input.js?v=4';
-import { drawPortrait, preloadFighter } from './art.js?v=4';
-import { drawActor } from './fighter-render.js?v=4';
-import { MOVES } from './fight.js?v=4';
-import { drawStrike } from './strike-render.js?v=4';
-import { findFighter, ROSTER, TEAMS } from './roster.js?v=4';
+import { actionName, familyName, fighterName, language, moveName, sideName, skillDetail, styleName, t } from './locale.js?v=5';
+import { drawPortrait, preloadFighter } from './art.js?v=5';
+import { drawActor } from './fighter-render.js?v=5';
+import { MOVES } from './fight.js?v=5';
+import { drawStrike } from './strike-render.js?v=5';
+import { findFighter, ROSTER, TEAMS } from './roster.js?v=5';
 
 export function setupRosterPicker({ selection, mode, confirm }) {
   const dialog = document.querySelector('#roster-dialog');
@@ -58,18 +58,23 @@ export function setupRosterPicker({ selection, mode, confirm }) {
     }
   }, { root: list, rootMargin: '80px' });
 
-  team.add(new Option('全部势力', ''));
-  for (const kingdom of new Set(TEAMS.map(group => group.kingdom))) team.add(new Option(kingdom, kingdom));
+  function updateTeams() {
+    const value = team.value;
+    team.replaceChildren(new Option(t('全部势力'), ''));
+    for (const kingdom of new Set(TEAMS.map(group => group.kingdom))) team.add(new Option(t(kingdom),kingdom));
+    team.value = value;
+  }
+  updateTeams();
 
-  const updatePreview = character => {
+  const updatePreview = (character, choice=0) => {
     candidate = character;
     preview.style.setProperty('--roster-accent', character.color);
-    dialog.querySelector('#roster-name').textContent = character.name;
-    dialog.querySelector('#roster-style').textContent = character.roman + ' · ' + character.family + ' / ' + character.style;
+    dialog.querySelector('#roster-name').textContent = fighterName(character);
+    dialog.querySelector('#roster-style').textContent = (language === 'zh' ? character.roman+' · ' : '') + familyName(character) + ' / ' + styleName(character);
     dialog.querySelector('#roster-basics').replaceChildren(...['A','C','B','D'].map(id => {
       const button=document.createElement('button');
       button.type='button'; button.dataset.basic=id;
-      button.textContent=CONTROL_NAMES[id]+' · '+character.techniques[id].name;
+      button.textContent=actionName(id)+' · '+moveName(character,character.techniques[id].name);
       button.onclick=()=>selectSkill(id,true);
       return button;
     }));
@@ -78,12 +83,12 @@ export function setupRosterPicker({ selection, mode, confirm }) {
       const play = document.createElement('button');
       play.type = 'button';
       play.dataset.preview = i;
-      play.setAttribute('aria-label', '演示' + skill.name);
+      play.setAttribute('aria-label', t('演示{name}',{name:moveName(character,skill.name)}));
       play.onclick = () => selectSkill(i, true);
       const name = document.createElement('strong');
       const detail = document.createElement('span');
-      name.textContent = skill.name;
-      detail.textContent = skill.commandText + ' · ' + skill.steps.length + ' 段' + (skill.cost ? ' · ' + skill.cost + ' 能量' : '');
+      name.textContent = moveName(character,skill.name);
+      detail.textContent = skillDetail(skill);
       play.append(name, detail);
       line.append(play);
       return line;
@@ -91,7 +96,7 @@ export function setupRosterPicker({ selection, mode, confirm }) {
     portrait.dataset.character = character.id;
     delete portrait.dataset.ready;
     preloadFighter(character).catch(() => { if (candidate === character) portrait.dataset.ready = 'error'; });
-    selectSkill(0);
+    selectSkill(choice);
     list.querySelectorAll('[data-character]').forEach(button => {
       button.setAttribute('aria-pressed', button.dataset.character === character.id);
     });
@@ -102,24 +107,28 @@ export function setupRosterPicker({ selection, mode, confirm }) {
     const normalize = text => text.toLowerCase().replaceAll('ü', 'u').replaceAll('lv', 'lu').replace(/\s+/g, '');
     const query = normalize(search.value);
     const fighters = ROSTER.filter(character => (!team.value || character.kingdom === team.value)
-      && (!query || [character.name, character.roman, character.family, character.style].some(text => normalize(text).includes(query))));
+      && (!query || [character.name, character.roman, fighterName(character,'en'), character.family, familyName(character,'en'), character.style, styleName(character,'en'), character.weapon].some(text => normalize(text).includes(query))));
     list.innerHTML = fighters.length ? fighters.map(character =>
       '<button class="fighter-card" type="button" data-character="' + character.id + '" aria-pressed="' + (candidate?.id === character.id)
       + '" style="--roster-accent:' + character.color + '"><canvas width="112" height="90" data-id="' + character.id
-      + '" aria-hidden="true"></canvas><b>' + character.name + '</b><small>' + character.family + '</small></button>',
-    ).join('') : '<p class="roster-empty">没有找到符合条件的角色。</p>';
-    dialog.querySelector('#roster-count').textContent = fighters.length + ' / ' + ROSTER.length + ' 名角色';
+      + '" aria-hidden="true"></canvas><b>' + fighterName(character) + '</b><small>' + familyName(character) + '</small></button>',
+    ).join('') : '<p class="roster-empty">' + t('没有找到符合条件的角色。') + '</p>';
+    dialog.querySelector('#roster-count').textContent = t('{count} / {total} 名角色',{count:fighters.length,total:ROSTER.length});
     list.scrollTop = 0;
     list.querySelectorAll('canvas').forEach(canvas => observer.observe(canvas));
   }
 
-  function chooseSide(player) {
-    side = player;
+  function sideLabels() {
     dialog.querySelectorAll('[data-side]').forEach(button => {
       const index = Number(button.dataset.side);
       button.setAttribute('aria-pressed', index === side);
-      button.textContent = index ? mode() === 'cpu' ? 'CPU 对手' : '2P' : '1P';
+      button.textContent = index && mode() === 'cpu' ? t('CPU 对手') : sideName(index);
     });
+  }
+
+  function chooseSide(player) {
+    side=player;
+    sideLabels();
     updatePreview(findFighter(selection()[side]));
   }
 
@@ -148,5 +157,8 @@ export function setupRosterPicker({ selection, mode, confirm }) {
       renderList();
     };
   });
-  return dialog;
+  return () => {
+    updateTeams();
+    if (dialog.open) { sideLabels(); updatePreview(candidate,selectedSkill); renderList(); }
+  };
 }

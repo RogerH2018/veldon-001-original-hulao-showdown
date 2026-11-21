@@ -31,8 +31,9 @@ kbd { display: inline-block; font: 600 .82em ui-monospace, monospace; }
 .top nav { display: flex; gap: .55rem; }
 .top nav button { font-size: .89rem; }
 .brand { color: var(--text); text-decoration: none; font-weight: 900; letter-spacing: .055em; display: flex; align-items: center; gap: .27rem; white-space: nowrap; }
-.brand span { color: var(--muted); }
-.brand i { display: inline-block; width: 18px; height: 18px; background: var(--gold); margin-right: .4rem; clip-path: polygon(0 0, 45% 0, 55% 44%, 70% 18%, 100% 18%, 56% 100%, 34% 100%); }
+.brand-wordmark { color:var(--text); }
+.brand-wordmark b { color:var(--muted); }
+.brand img { width:42px; height:42px; object-fit:contain; }
 .game { max-width: 1242px; margin: 0 auto; padding: 0 1.3rem 2rem; }
 .game:fullscreen { max-width: none; overflow: auto; background: var(--bg); padding: .6rem; }
 .game:fullscreen > .screen { max-width: min(100%, calc((100dvh - 70px) * 1.875)); margin-inline: auto; }
@@ -220,7 +221,6 @@ form { padding: 1rem; }
 @media (max-width: 560px) {
   .top nav button { padding-inline: .45rem; font-size: .8rem; }
   .brand { font-size: .82rem; }
-  .brand i { width: 12px; height: 13px; margin-right: .16rem; }
   .control-decks { grid-template-columns: 1fr; gap: .45rem; margin-top: .55rem; }
   .deck { padding: .63rem; }
   .stage-caption { gap: .45rem; padding-inline: .45rem; font-size: .78rem; }
@@ -274,4 +274,39 @@ form { padding: 1rem; }
   .roster-preview canvas { grid-row:1 / span 2; }
   #roster-skills { grid-row:2; }
   .macro-row { grid-template-columns: .64fr 1.15fr 1fr; }
+}
+.dialog-actions { display:flex; align-items:center; gap:.45rem; }
+.fullscreen-language { display:none; }
+.game:fullscreen .fullscreen-language { display:inline-block; }
+html:lang(en) .subtitle { display:none; }
+html:lang(en) .lobby h1 { font-size:clamp(2.05rem,5.7vw,4.6rem); letter-spacing:-.04em; text-transform:uppercase; }
+html:lang(en) .lobby h1 small { font-size:clamp(.75rem,1.24vw,1rem); }
+html:lang(en) .deck-macros { align-items:stretch; }
+html:lang(en) .fighter-card { min-width:0; overflow-wrap:anywhere; }
+html:lang(en) .pad button { padding-inline:.42rem; }
+[lang="en"] .clock span { white-space:nowrap; }
+@media(max-width:700px) {
+  .top { flex-wrap:wrap; }
+  .top nav { margin-left:auto; gap:.32rem; flex-wrap:wrap; }
+  .brand img { width:34px; height:34px; }
+  html:lang(en) .stage-caption { flex-wrap:wrap; gap:.35rem; }
+  html:lang(en) .deck-macros button,html:lang(en) .deck-macros > span { white-space:normal; }
+  html:lang(en) #roster-basics button { line-height:1.2; }
+}
+@media(max-width:530px){
+  .top .brand-wordmark { display:none; }
+  .top nav button { padding-inline:.43rem; }
+  html:lang(en) #roster-sides button { font-size:.82rem; }
+}
+.dialog-actions button { white-space:nowrap; }
+@media(max-width:700px) {
+  .roster-preview { grid-template-columns:minmax(108px,.96fr) minmax(0,1.04fr); }
+  .roster-preview canvas { grid-column:1; grid-row:1 / span 2; height:clamp(132px,22dvh,186px); object-fit:cover; }
+  .roster-identity { grid-column:2; grid-row:1; }
+  #roster-basics { grid-column:2; grid-row:2; grid-template-columns:1fr; }
+  #roster-skills { grid-column:1 / -1; grid-row:3; }
+  #roster-confirm { grid-row:4; }
+  html:lang(en) .roster-dialog .dialog-head h2 { font-size:clamp(1.08rem,5.4vw,1.55rem); letter-spacing:0; }
+  .dialog-actions { gap:.25rem; }
+  .dialog-actions button { padding-inline:.45rem; }
 }

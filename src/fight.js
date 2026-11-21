@@ -1,6 +1,6 @@
-import { PORT } from './input.js?v=4';
-import { DEFAULT_ROSTER, findFighter } from './roster.js?v=4';
-import { basicStroke, motionAt } from './motion.js?v=4';
+import { PORT } from './input.js?v=5';
+import { DEFAULT_ROSTER, findFighter } from './roster.js?v=5';
+import { basicStroke, motionAt } from './motion.js?v=5';
 
 export const WIDTH = 1200;
 export const HEIGHT = 640;
@@ -41,6 +41,7 @@ function advantage(tactic, other, airborne) {
 function makeFighter(id, character, wins = 0) {
   return {
     id, character, x: id ? 799 : 401, y: 0, vy: 0, facing: id ? -1 : 1, hp: 100, energy: 42,
+    walkDistance: 0, walkBlend: 0, landingFrames: 0,
     pose: 'idle', move: null, stun: 0, flash: 0, wins, guard: false, combo: 0, comboTimer: 0,
     input: new Set(), directions: [], commandHistory: [], pending: null, signatureBanner: null,
   };
@@ -116,6 +117,7 @@ export class Fight {
 
     this.clock--;
     const [left, right] = this.fighters;
+    const previousX = [left.x,right.x];
     for (const fighter of this.fighters) {
       const other = fighter.id ? left : right;
       if (!fighter.move && fighter.stun === 0 && fighter.facing * (other.x - fighter.x) < 0) {
@@ -125,6 +127,13 @@ export class Fight {
       this.updateFighter(fighter, new Set(controls[fighter.id]), other, presses[fighter.id]);
     }
     this.separate(left, right);
+    for (const f of this.fighters) {
+      const canStep = !f.move && !f.stun && !f.y && !f.vy && !f.input.has(PORT.down)
+        && f.input.has(PORT.left) !== f.input.has(PORT.right);
+      const travel = canStep ? clamp((f.x-previousX[f.id])*f.facing,-f.character.speed,f.character.speed) : 0;
+      f.walkDistance += travel;
+      f.walkBlend = clamp(f.walkBlend + (Math.abs(travel)>.05 ? .28 : -.23),0,1);
+    }
 
     const contacts = [];
     for (const fighter of this.fighters) {
@@ -183,9 +192,12 @@ export class Fight {
     if (fighter.signatureBanner?.until <= this.frame) fighter.signatureBanner = null;
     if (fighter.pending?.until < this.frame) fighter.pending = null;
     fighter.guard = false;
+    fighter.landingFrames = Math.max(0, fighter.landingFrames-1);
     if (fighter.y > 0 || fighter.vy > 0) {
+      const wasInAir = fighter.y > 0;
       fighter.y = Math.max(0, fighter.y + fighter.vy);
       fighter.vy = fighter.y === 0 ? 0 : fighter.vy - 0.81;
+      if (wasInAir && !fighter.y) fighter.landingFrames = 8;
     }
     if (fighter.stun > 0) {
       fighter.stun--;
@@ -236,7 +248,7 @@ export class Fight {
     if (motion === '236' && button === 'D' && fighter.energy >= MOVES.surge.cost) id = 'surge';
     fighter.directions = [];
     fighter.energy -= MOVES[id].cost ?? 0;
-    fighter.move = { id, age: 0 };
+    fighter.move = { id, age: 0, startX:fighter.x };
     fighter.pose = 'attack';
     this.onEvent('swing', { id: fighter.id, weapon: fighter.character.weapon, kind: basicStroke(fighter.character, id) });
   }
@@ -251,7 +263,7 @@ export class Fight {
     if (!matched) return false;
     history.length = 0;
     const result = this.requestSignature(fighter.id, matched.slot, true);
-    if (result === 'energy') fighter.inputNotice = {text: matched.name + ' · 能量不足', until: this.frame + 65};
+    if (result === 'energy') fighter.inputNotice = {text: matched.name + ' · 能量不足', skill: matched, reason:'能量不足', until: this.frame + 65};
     return result === 'started' || result === 'queued';
   }
 
@@ -273,7 +285,7 @@ export class Fight {
       fighter.vy = Math.min(fighter.vy, -drop / skill.steps[0].at);
     }
     fighter.energy -= skill.cost;
-    fighter.move = { id: 'signature', age: 0, skill, confirmed: false, next: 0 };
+    fighter.move = { id: 'signature', age: 0, startX:fighter.x, skill, confirmed: false, next: 0 };
     fighter.pose = 'attack';
     fighter.directions = [];
     fighter.signatureBanner = { name: skill.name, hits: 0, max: skill.steps.length, until: this.frame + skill.end + 40 };

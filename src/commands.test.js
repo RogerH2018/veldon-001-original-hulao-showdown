@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Fight, MOVES } from './fight.js?v=4';
-import { ROSTER } from './roster.js?v=4';
-import { motionAt } from './motion.js?v=4';
-import { skeleton } from './fighter-render.js?v=4';
+import { Fight, MOVES } from './fight.js?v=5';
+import { ROSTER } from './roster.js?v=5';
+import { MODEL_SCALE, motionAt } from './motion.js?v=5';
+import { skeleton } from './fighter-render.js?v=5';
 import {
   CONTROL_NAMES,
   DEFAULT_BINDINGS,
@@ -12,8 +12,8 @@ import {
   MacroPlayer,
   PORT,
   describeCombo,
-} from './input.js?v=4';
-import { migrateSettings } from './settings.js?v=4';
+} from './input.js?v=5';
+import { migrateSettings } from './settings.js?v=5';
 
 function ready(character, side, onEvent) {
   const ids = [ROSTER[0].id, ROSTER[1].id];
@@ -121,7 +121,16 @@ test('every general has a distinct four-move score and individually choreographe
           Math.hypot(front.x - back.x, front.y - back.y) >= 18,
           c.name + ' ' + (id ?? 'idle') + ' wrists at ' + age
         );
-        for (const leg of rig.legs) assert.ok(Number.isFinite(leg.knee.x + leg.ankle.y + leg.foot.x));
+        const span = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+        for (const arm of rig.arms) {
+          assert.ok(Math.abs(span(arm.from, arm.elbow) - 26 * rig.bulk) < 0.01);
+          assert.ok(Math.abs(span(arm.elbow, arm.wrist) - 24 * rig.bulk) < 0.01);
+        }
+        for (const leg of rig.legs) {
+          assert.ok(leg.foot.y <= 0.001);
+          assert.ok(Math.abs(span(leg.from, leg.knee) - 31 * rig.bulk) < 0.01);
+          assert.ok(Math.abs(span(leg.knee, leg.ankle) - 26 * rig.bulk) < 0.01);
+        }
       }
   }
   assert.equal(names.size, 400);
@@ -149,4 +158,43 @@ test('old default scores migrate and edited legacy timing, bindings and chords s
   assert.equal(current.macros[1][1].gap, 21);
   assert.equal(current.macros[1][1].source, 'custom');
   assert.equal(describeCombo(custom.sequence), '快击 → 等待 8 帧 → 下 → 下+前 → 前+快击+重破');
+});
+
+test('the planted foot stays in place while advancing and retreating on either side; jumps settle on both soles', () => {
+  for (const side of [0, 1])
+    for (const direction of ['left', 'right']) {
+      const match = ready(ROSTER[1], side),
+        actor = match.fighters[side];
+      match.fighters[0].x = 330;
+      match.fighters[1].x = 870;
+      const input = [[], []];
+      input[side] = [PORT[direction]];
+      let previous,
+        lockedFrames = 0;
+      for (let i = 0; i < 48; i++) {
+        match.step(input);
+        const model = skeleton(actor.character, motionAt(actor, match.frame, MOVES));
+        const soles = model.legs.map((l) => ({
+          x: actor.x + actor.facing * MODEL_SCALE * l.foot.x,
+          y: l.foot.y,
+        }));
+        if (previous && actor.walkBlend === 1)
+          soles.forEach((sole, j) => {
+            if (Math.abs(sole.y) < 1e-6 && Math.abs(previous[j].y) < 1e-6) {
+              assert.ok(Math.abs(sole.x - previous[j].x) < 0.001);
+              lockedFrames++;
+            }
+          });
+        previous = actor.walkBlend === 1 ? soles : null;
+      }
+      assert.ok(lockedFrames > 20);
+      input[side] = [PORT.up];
+      match.step(input);
+      match.step();
+      assert.ok(actor.y > 0);
+      while (actor.y > 0) match.step();
+      assert.equal(actor.landingFrames, 8);
+      const grounded = skeleton(actor.character, motionAt(actor, match.frame, MOVES));
+      assert.ok(grounded.legs.every((l) => Math.abs(l.foot.y) < 0.001));
+    }
 });

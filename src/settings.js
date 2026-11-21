@@ -1,11 +1,13 @@
-import { ACTIONS, DEFAULT_BINDINGS, DEFAULT_MACROS, OLD_DEFAULTS, CONTROL_NAMES, EDITOR_ACTIONS, namedActions, describeCombo, compileCombo, keyName, normalizeKey } from './input.js?v=4';
-import { DEFAULT_ROSTER, findFighter } from './roster.js?v=4';
+import { actionName, commandName, fighterName, moveName, sideName, t } from './locale.js?v=5';
+import { ACTIONS, DEFAULT_BINDINGS, DEFAULT_MACROS, OLD_DEFAULTS, CONTROL_NAMES, EDITOR_ACTIONS, namedActions, describeCombo, compileCombo, keyName, normalizeKey } from './input.js?v=5';
+import { DEFAULT_ROSTER, findFighter } from './roster.js?v=5';
 
 const $ = selector => document.querySelector(selector);
 const storageKey = 'veldon.hulao.v1';
 const legacyMacroNames = ['迎潮', '回流', '放电'];
 const reserved = new Set(['Escape', 'Enter', 'Tab', 'MetaLeft', 'MetaRight', 'AltLeft', 'AltRight', 'ControlLeft', 'ControlRight']);
 export const labels = CONTROL_NAMES;
+export const macroName = macro => DEFAULT_MACROS[0].some(slot => slot.name === macro.name) ? t(macro.name) : macro.name;
 const defaults = () => ({
   mode: 'cpu', difficulty: 2, sound: true,
   roster: [...DEFAULT_ROSTER],
@@ -14,27 +16,27 @@ const defaults = () => ({
 
 export function validateSettings(config) {
   if (!['cpu', 'local'].includes(config.mode) || ![1, 2, 3].includes(config.difficulty) || typeof config.sound !== 'boolean') {
-    throw new Error('对战设置无效');
+    throw new Error(t('对战设置无效'));
   }
-  if (config.bindings.length !== 2 || config.macros.length !== 2) throw new Error('需要两位玩家的设置');
-  if (config.roster.length !== 2 || !config.roster.every(findFighter)) throw new Error('对战角色无效');
+  if (config.bindings.length !== 2 || config.macros.length !== 2) throw new Error(t('需要两位玩家的设置'));
+  if (config.roster.length !== 2 || !config.roster.every(findFighter)) throw new Error(t('对战角色无效'));
   const used = new Set();
   const bind = (key, id) => {
     if (typeof key !== 'string' || !key || reserved.has(key) || used.has(key)) {
-      throw new Error(id + 'P 的按键重复或不可用：' + keyName(String(key ?? '')));
+      throw new Error(t('{side} 的按键重复或不可用：{key}', {side:sideName(id-1),key:keyName(String(key ?? ''))}));
     }
     used.add(key);
   };
   config.bindings.forEach((bindings, player) => {
     for (const action of ACTIONS) bind(bindings[action], player + 1);
-    if (config.macros[player].length !== 3) throw new Error('每位玩家需要三个连招槽');
+    if (config.macros[player].length !== 3) throw new Error(t('每位玩家需要三个连招槽'));
     config.macros[player].forEach((macro, slot) => {
       bind(macro.key, player + 1);
-      if (!['signature', 'custom'].includes(macro.source)) throw new Error('连招来源无效');
+      if (!['signature', 'custom'].includes(macro.source)) throw new Error(t('连招来源无效'));
       if (typeof macro.name !== 'string' || macro.name.trim().length < 1 || macro.name.length > 20) {
-        throw new Error((player + 1) + 'P 连招 ' + (slot + 1) + ' 的名称须为 1 至 20 字');
+        throw new Error(t('{side} 连招 {n} 的名称须为 1 至 20 字',{side:sideName(player),n:slot+1}));
       }
-      if (typeof macro.sequence !== 'string' || macro.sequence.length > 160) throw new Error('连招指令须在 160 字符以内');
+      if (typeof macro.sequence !== 'string' || macro.sequence.length > 160) throw new Error(t('连招指令须在 160 字符以内'));
       compileCombo(macro.sequence, player ? -1 : 1, macro.gap);
     });
   });
@@ -101,18 +103,18 @@ export function setupSettings(dialog, callbacks) {
   function renderForm() {
     const fighters = draft.roster.map(findFighter);
     $('#settings-tabs').innerHTML = fighters.map((fighter, index) => '<button type="button" data-tab="' + index + '">'
-      + (index + 1) + 'P ' + fighter.name + '</button>').join('');
+      + sideName(index) + ' ' + fighterName(fighter) + '</button>').join('');
     $('#settings-players').innerHTML = fighters.map((fighter, index) => '<section class="settings-pane" data-pane="' + index
-      + '"><h3>方向与攻击</h3><div class="binding-grid">'
-      + ACTIONS.map(action => '<label>' + labels[action] + ' <button type="button" data-field="binding" data-value="' + action + '"></button></label>').join('')
-      + '</div><h3>快捷连招</h3><p class="hint">选「自定义」后，按实际出招顺序点方向和招式。同一方向可以连点，左右以屏幕为准。</p>'
-      + draft.macros[index].map((_, i) => '<div class="macro-row" data-row="'+i+'"><label>快捷键 <button type="button" data-field="key" data-value="'+i
-        +'"></button></label><label>招式来源 <select data-prop="source"><option value="signature">'+fighter.signatures[i].name
-        +'</option><option value="custom">自定义</option></select></label><label data-custom-name>名称 <input maxlength="20" data-prop="name"></label>'
-        +'<output class="command-line" aria-live="polite"></output><div class="command-tools" aria-label="编排连招">'
-        +EDITOR_ACTIONS.map(key => '<button type="button" data-add="'+key+'">'+labels[key]+'</button>').join('')
-        +'<button type="button" data-undo>撤销</button><button type="button" data-clear>清空</button></div>'
-        +'<button class="rewrite-command" type="button" data-rewrite>重新编排</button></div>').join('') + '</section>').join('');
+      + '"><h3>' + t('方向与攻击') + '</h3><div class="binding-grid">'
+      + ACTIONS.map(action => '<label>' + actionName(action) + ' <button type="button" data-field="binding" data-value="' + action + '"></button></label>').join('')
+      + '</div><h3>' + t('快捷连招') + '</h3><p class="hint">' + t('选「自定义」后，按实际出招顺序点方向和招式。同一方向可以连点，左右以屏幕为准。') + '</p>'
+      + draft.macros[index].map((_, i) => '<div class="macro-row" data-row="'+i+'"><label>' + t('快捷键') + ' <button type="button" data-field="key" data-value="'+i
+        +'"></button></label><label>' + t('招式来源') + ' <select data-prop="source"><option value="signature">'+moveName(fighter,fighter.signatures[i].name)
+        +'</option><option value="custom">' + t('自定义') + '</option></select></label><label data-custom-name>' + t('名称') + ' <input maxlength="20" data-prop="name"></label>'
+        +'<output class="command-line" aria-live="polite"></output><div class="command-tools" aria-label="' + t('编排连招') + '">'
+        +EDITOR_ACTIONS.map(key => '<button type="button" data-add="'+key+'">'+actionName(key)+'</button>').join('')
+        +'<button type="button" data-undo>' + t('撤销') + '</button><button type="button" data-clear>' + t('清空') + '</button></div>'
+        +'<button class="rewrite-command" type="button" data-rewrite>' + t('重新编排') + '</button></div>').join('') + '</section>').join('');
     dialog.querySelectorAll('[data-pane]').forEach(pane => {
       const player = Number(pane.dataset.pane);
       pane.querySelectorAll('button[data-field]').forEach(button => {
@@ -121,7 +123,7 @@ export function setupSettings(dialog, callbacks) {
         button.onclick = () => {
           stopRecording();
           recording = field;
-          button.textContent = '请按键';
+          button.textContent = t('请按键');
           button.setAttribute('aria-pressed', 'true');
         };
       });
@@ -130,15 +132,15 @@ export function setupSettings(dialog, callbacks) {
         const source=row.querySelector('select'), name=row.querySelector('input');
         const output=row.querySelector('output'), tools=row.querySelector('.command-tools'), rewrite=row.querySelector('[data-rewrite]');
         source.value=slot.source;
-        name.value=slot.name;
+        name.value=macroName(slot);
         name.oninput=()=>{ slot.name=name.value; };
         function showCommand() {
           const custom=slot.source==='custom', legacy=!!slot.sequence && !namedActions(slot.sequence);
           row.querySelector('[data-custom-name]').hidden=!custom;
           tools.hidden=!custom || legacy;
           rewrite.hidden=!custom || !legacy;
-          output.textContent=custom ? (slot.sequence ? describeCombo(slot.sequence) : '点一个方向或招式开始')
-            + (legacy ? '（旧编排，段间 '+slot.gap+' 帧）' : '') : skill.commandText;
+          output.textContent=custom ? (slot.sequence ? describeCombo(slot.sequence) : t('点一个方向或招式开始'))
+            + (legacy ? t('（旧编排，段间 {n} 帧）',{n:slot.gap}) : '') : commandName(skill);
           row.querySelector('[data-undo]').disabled=row.querySelector('[data-clear]').disabled=!slot.sequence;
         }
         source.onchange=()=>{
@@ -154,7 +156,7 @@ export function setupSettings(dialog, callbacks) {
           if (button.hasAttribute('data-clear')) keys=[];
           else if (button.hasAttribute('data-undo')) keys.pop();
           else if (keys.length<20) keys.push(button.dataset.add);
-          else { feedback('一套自定义连招最多 20 步。'); return; }
+          else { feedback(t('一套自定义连招最多 20 步。')); return; }
           slot.sequence=keys.map(key=>labels[key]).join(' ');
           feedback(''); showCommand();
         };
@@ -184,7 +186,7 @@ export function setupSettings(dialog, callbacks) {
       return;
     }
     if (reserved.has(key) || !key) {
-      feedback('请选择字母、数字或其他未占用的按键。');
+      feedback(t('请选择字母、数字或其他未占用的按键。'));
       return;
     }
     const { player, field, value } = recording;
@@ -214,7 +216,7 @@ export function setupSettings(dialog, callbacks) {
     draft.macros = original.macros;
     recording = null;
     renderForm();
-    feedback('已恢复默认键位，保存后生效。');
+    feedback(t('已恢复默认键位，保存后生效。'));
   };
   $('#settings-form').onsubmit = event => {
     event.preventDefault();
@@ -226,5 +228,8 @@ export function setupSettings(dialog, callbacks) {
     }
     callbacks.onSave(draft);
     dialog.close();
+  };
+  return () => {
+    if (dialog.open) { stopRecording(); feedback(''); renderForm(); }
   };
 }

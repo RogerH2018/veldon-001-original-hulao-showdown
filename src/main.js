@@ -1,12 +1,19 @@
-import { Fight, Opponent, ROUND_SECONDS, TICKS } from './fight.js?v=4';
-import { ACTIONS, MacroPlayer, PORT, keyName, normalizeKey } from './input.js?v=4';
-import { createRenderer, preloadStage } from './render.js?v=4';
-import { FightSound } from './sound.js?v=4';
-import { loadSettings, saveSettings, setupSettings, labels } from './settings.js?v=4';
-import { preloadFighter } from './art.js?v=4';
-import { setupRosterPicker } from './picker.js?v=4';
+import { actionName, bindPageLanguage, fighterName, language, localeKey, moveName, preferredLanguage, setLanguage, sideName, skillDetail, styleName, t } from './locale.js?v=5';
+import { Fight, Opponent, ROUND_SECONDS, TICKS } from './fight.js?v=5';
+import { ACTIONS, MacroPlayer, PORT, keyName, normalizeKey } from './input.js?v=5';
+import { createRenderer, preloadStage } from './render.js?v=5';
+import { FightSound } from './sound.js?v=5';
+import { loadSettings, saveSettings, setupSettings, macroName } from './settings.js?v=5';
+import { preloadFighter } from './art.js?v=5';
+import { setupRosterPicker } from './picker.js?v=5';
 
 const $ = selector => document.querySelector(selector);
+const url = new URL(location.href);
+let savedLanguage;
+try { savedLanguage = localStorage.getItem(localeKey); } catch {}
+setLanguage(preferredLanguage(url.searchParams.get('lang'), savedLanguage, navigator.languages));
+const translatePage = bindPageLanguage(document);
+translatePage();
 const dialog = $('#preferences');
 const rosterDialog = $('#roster-dialog');
 let settings = loadSettings();
@@ -29,16 +36,16 @@ const fight = new Fight((event, id) => {
   if (event === 'round' || event === 'roundEnd') resetInputs();
   if (event === 'fight') {
     renderTouch();
-    status('开始对战');
+    status(t('开始对战'));
   }
-  if (event === 'counter') status(fight.fighters[id.id].character.name + '打出了克制');
-  if (event === 'match') status(id === null ? '平局' : fight.selection[id].name + '获胜');
+  if (event === 'counter') status(t('{name}打出了克制', {name:fighterName(fight.fighters[id.id].character)}));
+  if (event === 'match') status(id === null ? t('平局') : t('{name}获胜',{name:fighterName(fight.selection[id])}));
 }, settings.roster);
 const render = createRenderer($('#arena'));
 const playerCount = () => settings.mode === 'local' ? 2 : 1;
 
 function persist() {
-  if (!saveSettings(settings)) status('设置已应用。本浏览器无法持久保存设置。');
+  if (!saveSettings(settings)) status(t('设置已应用。本浏览器无法持久保存设置。'));
 }
 
 function resetInputs() {
@@ -62,20 +69,21 @@ function refresh() {
   $('#local-mode').setAttribute('aria-pressed', settings.mode === 'local');
   $('#difficulty').value = settings.difficulty;
   $('#difficulty-control').hidden = settings.mode === 'local';
-  $('#mode-status').textContent = settings.mode === 'cpu' ? '单人对战' : '双人同屏';
-  $('#picked-0').textContent = '1P · ' + fight.selection[0].name;
-  $('#picked-1').textContent = (settings.mode === 'cpu' ? 'CPU · ' : '2P · ') + fight.selection[1].name;
+  $('#mode-status').textContent = t(settings.mode === 'cpu' ? '单人对战' : '双人同屏');
+  $('#picked-0').textContent = sideName(0) + ' · ' + fighterName(fight.selection[0]);
+  $('#picked-1').textContent = (settings.mode === 'cpu' ? 'CPU' : sideName(1)) + ' · ' + fighterName(fight.selection[1]);
   $('#start').disabled = loading;
-  $('#start').innerHTML = loading ? '正在准备角色…' : '开始对战 <kbd>Enter</kbd>';
-  $('#opponent-label').textContent = settings.mode === 'cpu' ? 'CPU' : '2P';
+  $('#start').innerHTML = loading ? t('正在准备角色…') : t('开始对战') + ' <kbd>Enter</kbd>';
+  $('#opponent-label').textContent = settings.mode === 'cpu' ? 'CPU' : sideName(1);
   $('#sound').setAttribute('aria-pressed', settings.sound);
-  $('#sound').textContent = settings.sound ? '声音开启' : '声音关闭';
+  $('#sound').textContent = t(settings.sound ? '声音开启' : '声音关闭');
   $('#pause').disabled = inLobby || finished;
-  $('#pause').textContent = paused ? '继续 · Esc' : '暂停 · Esc';
+  $('#pause').textContent = t(paused ? '继续 · Esc' : '暂停 · Esc');
   $('#overlay').hidden = dialog.open || (!paused && !finished);
-  $('#overlay-title').textContent = paused ? '对战暂停' : finished ? fight.selection[fight.roundWinner].name + '获胜' : '';
-  $('#overlay-detail').textContent = finished ? fight.fighters.map(fighter => fighter.wins).join(' : ') + ' · 对战结束' : '';
-  $('#continue').textContent = paused ? '继续对战' : '再战一场';
+  $('#overlay-title').textContent = paused ? t('对战暂停') : finished ? t('{name}获胜',{name:fighterName(fight.selection[fight.roundWinner])}) : '';
+  $('#overlay-detail').textContent = finished ? fight.fighters.map(fighter => fighter.wins).join(' : ') + ' · ' + t('对战结束') : '';
+  $('#continue').textContent = t(paused ? '继续对战' : '再战一场');
+  $('#fullscreen').textContent = t(document.fullscreenElement ? '退出全屏' : '全屏');
   audio.enabled = settings.sound;
   document.querySelectorAll('.skill-trigger').forEach(button => { button.disabled = phase !== 'fight' || paused || dialog.open; });
 }
@@ -83,13 +91,13 @@ function refresh() {
 function updateDecks() {
   $('#decks').innerHTML = fight.selection.map((fighter, index) => {
     const auto = index === 1 && settings.mode === 'cpu';
-    const group = actions => actions.map(action => '<span title="' + labels[action] + '"><kbd></kbd><small>'
-      + (arrows[action] ?? labels[action]) + '</small></span>').join('');
+    const group = actions => actions.map(action => '<span title="' + actionName(action) + '"><kbd></kbd><small>'
+      + (arrows[action] ?? actionName(action)) + '</small></span>').join('');
     return '<article class="deck deck-' + index + '" style="--accent:' + fighter.color + '" data-deck="' + index + '"><div class="deck-title"><b>'
-      + (auto ? 'CPU' : (index + 1) + 'P') + '</b><strong>' + fighter.name + '</strong><span>' + fighter.style + '</span></div>'
-      + (auto ? '<p class="cpu-note">电脑难度 · ' + ['入门', '标准', '进阶'][settings.difficulty - 1] + '</p>'
+      + (auto ? 'CPU' : sideName(index)) + '</b><strong>' + fighterName(fighter) + '</strong><span>' + styleName(fighter) + '</span></div>'
+      + (auto ? '<p class="cpu-note">' + t('电脑难度') + ' · ' + t(['入门', '标准', '进阶'][settings.difficulty - 1]) + '</p>'
         : '<div class="deck-keys"><div>' + group(ACTIONS.slice(0, 4)) + '</div><div>' + group(ACTIONS.slice(4))
-        + '</div></div>') + '<div class="deck-macros" aria-label="专属连招"></div></article>';
+        + '</div></div>') + '<div class="deck-macros" aria-label="' + t('专属连招') + '"></div></article>';
   }).join('');
   document.querySelectorAll('[data-deck]').forEach(deck => {
     const index = Number(deck.dataset.deck);
@@ -103,7 +111,7 @@ function updateDecks() {
       const label = document.createElement(auto ? 'span' : 'button');
       const key = document.createElement('kbd');
       const detail = document.createElement('small');
-      detail.textContent = skill.commandText + ' · ' + skill.steps.length + ' 段' + (skill.cost ? ' · ' + skill.cost + ' 能量' : '');
+      detail.textContent = skillDetail(skill);
       if (!auto) {
         label.type = 'button';
         label.className = 'skill-trigger';
@@ -114,14 +122,14 @@ function updateDecks() {
           label.append(key, ' ');
         }
       }
-      label.append(skill.name, detail);
+      label.append(moveName(fight.selection[index],skill.name), detail);
       container.append(label);
     });
     if (index < playerCount()) settings.macros[index].filter(macro => macro.source === 'custom').forEach(macro => {
       const tag = document.createElement('span');
       const key = document.createElement('kbd');
       key.textContent = keyName(macro.key);
-      tag.append(key, ' ' + macro.name);
+      tag.append(key, ' ' + macroName(macro));
       container.append(tag);
     });
   });
@@ -129,18 +137,18 @@ function updateDecks() {
 
 function renderTouch() {
   $('#touch').innerHTML = fight.selection.slice(0, playerCount()).map((fighter, index) => {
-    const buttons = actions => actions.map(action => '<button type="button" aria-label="' + fighter.name + ' ' + labels[action]
-      + '" data-player="' + index + '" data-action="' + action + '">' + (arrows[action] ?? labels[action]) + '</button>').join('');
+    const buttons = actions => actions.map(action => '<button type="button" aria-label="' + fighterName(fighter) + ' ' + actionName(action)
+      + '" data-player="' + index + '" data-action="' + action + '">' + (arrows[action] ?? actionName(action)) + '</button>').join('');
     const shortcuts = fighter.signatures.map((skill, i) => '<button type="button" data-player="' + index
-      + '" data-macro="' + i + '">' + skill.name + '</button>').join('');
+      + '" data-macro="' + i + '">' + moveName(fighter,skill.name) + '</button>').join('');
     const custom = settings.macros[index].map((macro, i) => macro.source === 'custom' ? '<button type="button" data-player="'
       + index + '" data-custom="' + i + '"></button>' : '').join('');
-    return '<div class="touch-deck deck-' + index + '"><b>' + (index + 1) + 'P</b><div class="pad">' + buttons(ACTIONS.slice(0, 4))
+    return '<div class="touch-deck deck-' + index + '"><b>' + sideName(index) + '</b><div class="pad">' + buttons(ACTIONS.slice(0, 4))
       + '</div><div class="pad">' + buttons(ACTIONS.slice(4)) + '</div><div class="touch-macros">' + shortcuts + custom + '</div></div>';
   }).join('');
   document.querySelectorAll('#touch button[data-custom]').forEach(button => {
     const { player, custom } = button.dataset;
-    button.textContent = settings.macros[player][custom].name;
+    button.textContent = macroName(settings.macros[player][custom]);
   });
 }
 
@@ -155,7 +163,7 @@ async function start() {
     await Promise.all([preloadStage(), ...fight.selection.map(preloadFighter)]);
   } catch {
     $('#load-error').hidden = false;
-    status('角色美术加载失败，请刷新后重试。');
+    status(t('角色美术加载失败，请刷新后重试。'));
     return;
   } finally {
     loading = false;
@@ -183,7 +191,7 @@ function togglePause() {
   paused = !paused;
   resetInputs();
   refresh();
-  status(paused ? '对战暂停' : '继续对战');
+  status(t(paused ? '对战暂停' : '继续对战'));
   if (paused) $('#continue').focus({ preventScroll: true });
 }
 
@@ -276,14 +284,14 @@ function triggerSignature(player, slot) {
   if (result === 'busy' || result === 'queued') {
     const text = result === 'queued' ? '已预输入' : fighter.stun ? '受击硬直中' : fighter.y > 65 ? '落地后出招' : '招式进行中';
     fighter.inputNotice = { text, until: fight.frame + 34 };
-    status(text);
+    status(t(text));
   }
   if (result === 'energy') {
     const skill = fighter.character.signatures[slot];
     if (!fighter.move?.skill) {
       fighter.signatureBanner = { name: skill.name, result: '能量不足', hits: 0, max: skill.steps.length, until: fight.frame + 64 };
     }
-    status(skill.name + '需要 ' + skill.cost + ' 能量');
+    status(t('{name}需要 {n} 能量',{name:moveName(fighter.character,skill.name),n:skill.cost}));
   }
 }
 
@@ -294,14 +302,14 @@ function setMode(mode) {
   updateDecks();
 }
 
-setupSettings(dialog, {
+const redrawSettings = setupSettings(dialog, {
   read: () => settings,
   beforeOpen: resetInputs,
   afterOpen: refresh,
   afterClose: () => { resetInputs(); refresh(); $('#settings').focus(); },
   onSave: updated => { settings = updated; persist(); updateDecks(); renderTouch(); },
 });
-setupRosterPicker({
+const redrawRoster = setupRosterPicker({
   selection: () => settings.roster,
   mode: () => settings.mode,
   confirm(player, character) {
@@ -339,34 +347,36 @@ if (document.fullscreenEnabled) {
       if (document.fullscreenElement) await document.exitFullscreen();
       else await $('.game').requestFullscreen();
     } catch {
-      status('浏览器未能进入全屏。');
+      status(t('浏览器未能进入全屏。'));
     }
   };
   document.addEventListener('fullscreenchange', () => {
-    button.textContent = document.fullscreenElement ? '退出全屏' : '全屏';
+    button.textContent = t(document.fullscreenElement ? '退出全屏' : '全屏');
   });
 }
 
-const fighterPanel = (fighter, id) => '<article class="fighter deck-' + id + '"><div class="fighter-name"><b>' + fighter.name
-  + '</b><span>' + fighter.roman + '</span><small' + (id ? ' id="opponent-label"' : '') + '>' + (id ? 'CPU' : '1P') + '</small></div>'
-  + '<div class="health" role="progressbar" aria-label="' + fighter.name + '生命" aria-valuemin="0" aria-valuemax="100"><span></span></div>'
-  + '<div class="charge" role="progressbar" aria-label="' + fighter.name + '能量" aria-valuemin="0" aria-valuemax="100"><span></span></div>'
+const fighterPanel = id => '<article class="fighter deck-' + id + '"><div class="fighter-name"><b></b><span></span><small'
+  + (id ? ' id="opponent-label"' : '') + '></small></div>'
+  + '<div class="health" role="progressbar" aria-valuemin="0" aria-valuemax="100"><span></span></div>'
+  + '<div class="charge" role="progressbar" aria-valuemin="0" aria-valuemax="100"><span></span></div>'
   + '<div class="wins"><i></i><i></i></div><span class="hits"></span><span class="counter-call"></span></article>';
-$('#hud').innerHTML = fighterPanel(fight.selection[0], 0) + '<div class="clock"><b id="timer">' + ROUND_SECONDS
-  + '</b><span id="round">第 1 局</span></div>' + fighterPanel(fight.selection[1], 1);
+$('#hud').innerHTML = fighterPanel(0) + '<div class="clock"><b id="timer">' + ROUND_SECONDS
+  + '</b><span id="round"></span></div>' + fighterPanel(1);
 const panels = [...document.querySelectorAll('.fighter')];
 
 function updateHud() {
   for (const fighter of fight.fighters) {
     const panel = panels[fighter.id];
     const character = fighter.character;
-    if (panel.dataset.character !== character.id) {
+    if (panel.dataset.character !== character.id || panel.lang !== document.documentElement.lang) {
+      panel.lang = document.documentElement.lang;
       panel.dataset.character = character.id;
       panel.style.setProperty('--accent', character.color);
-      panel.querySelector('.fighter-name b').textContent = character.name;
-      panel.querySelector('.fighter-name span').textContent = character.roman;
-      panel.querySelector('.health').setAttribute('aria-label', character.name + '生命');
-      panel.querySelector('.charge').setAttribute('aria-label', character.name + '能量');
+      panel.querySelector('.fighter-name b').textContent = fighterName(character);
+      panel.querySelector('.fighter-name span').textContent = language === 'en' ? t(character.kingdom) : character.roman;
+      panel.querySelector('.fighter-name small').textContent = fighter.id && settings.mode==='cpu' ? 'CPU' : sideName(fighter.id);
+      panel.querySelector('.health').setAttribute('aria-label', t('{name}生命',{name:fighterName(character)}));
+      panel.querySelector('.charge').setAttribute('aria-label', t('{name}能量',{name:fighterName(character)}));
     }
     for (const [selector, value] of [['.health', fighter.hp], ['.charge', fighter.energy]]) {
       const bar = panel.querySelector(selector);
@@ -374,15 +384,15 @@ function updateHud() {
       bar.setAttribute('aria-valuenow', value);
     }
     panel.querySelectorAll('.wins i').forEach((marker, index) => marker.classList.toggle('won', index < fighter.wins));
-    panel.querySelector('.counter-call').textContent = fighter.counterBanner?.until > fight.frame ? fighter.counterBanner.name
-      : fighter.inputNotice?.until > fight.frame ? fighter.inputNotice.text : '';
+    panel.querySelector('.counter-call').textContent = fighter.counterBanner?.until > fight.frame ? t(fighter.counterBanner.name)
+      : fighter.inputNotice?.until > fight.frame ? (fighter.inputNotice.skill ? moveName(character,fighter.inputNotice.skill.name)+' · '+t(fighter.inputNotice.reason) : t(fighter.inputNotice.text)) : '';
     const banner = fighter.signatureBanner;
     panel.querySelector('.hits').textContent = banner
-      ? banner.name + ' · ' + (banner.result ?? (banner.hits ? banner.hits + '/' + banner.max + ' 命中' : '起手'))
-      : fighter.combo > 1 ? fighter.combo + ' 次连续命中' : '';
+      ? moveName(character,banner.name) + ' · ' + (banner.result ? t(banner.result) : banner.hits ? t('{hits}/{max} 命中',banner) : t('起手'))
+      : fighter.combo > 1 ? t('{n} 次连续命中',{n:fighter.combo}) : '';
   }
   $('#timer').textContent = Math.ceil(fight.clock / TICKS);
-  $('#round').textContent = '第 ' + fight.round + ' 局';
+  $('#round').textContent = t('第 {n} 局',{n:fight.round});
 }
 
 function updateAnnouncement() {
@@ -390,8 +400,8 @@ function updateAnnouncement() {
   const phase = fight.phase;
   announcement.hidden = paused || dialog.open || !['intro', 'roundEnd'].includes(phase);
   if (!announcement.hidden) {
-    announcement.textContent = phase === 'intro' ? '第 ' + fight.round + ' 局'
-      : fight.roundWinner === null ? '平局' : fight.selection[fight.roundWinner].name + ' 赢得本局';
+    announcement.textContent = phase === 'intro' ? t('第 {n} 局',{n:fight.round})
+      : fight.roundWinner === null ? t('平局') : t('{name} 赢得本局',{name:fighterName(fight.selection[fight.roundWinner])});
   }
 }
 
@@ -422,6 +432,27 @@ function animate(timestamp) {
   updateAnnouncement();
   render(fight, fight.phase === 'lobby' ? timestamp / tick : fight.frame);
   requestAnimationFrame(animate);
+}
+
+for (const toggle of document.querySelectorAll('[data-language-switch]')) {
+  toggle.onclick = () => {
+    setLanguage(language === 'en' ? 'zh' : 'en');
+    try { localStorage.setItem(localeKey,language); } catch {}
+    if (url.searchParams.has('lang')) {
+      url.searchParams.set('lang',language);
+      history.replaceState(null,'',url);
+    }
+    translatePage();
+    pointers.clear();
+    redrawSettings();
+    redrawRoster();
+    refresh();
+    updateDecks();
+    renderTouch();
+    updateHud();
+    updateAnnouncement();
+    status('');
+  };
 }
 
 refresh();

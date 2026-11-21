@@ -1,3 +1,5 @@
+export const MODEL_SCALE = 1.23;
+export const WALK_CYCLE = 72;
 // Wrist x/y relative to the shoulder, weapon angle, torso lean, leading step, body lift, weight shift.
 // Each stroke has anticipation, contact and follow-through poses, anchored to the simulation hit tick.
 const strokes = {
@@ -146,6 +148,7 @@ function attackPose(age, steps, end, rest) {
 export function motionAt(fighter, frame, table) {
   const { character: c, move, pose } = fighter;
   const rest = stance(c);
+  const gaitDistance = (fighter.walkDistance ?? 0) / MODEL_SCALE;
   const rhythm = Math.sin(frame * (0.072 + c.index * 0.002) + c.number);
   let values = rest.slice(),
     beat,
@@ -173,7 +176,7 @@ export function motionAt(fighter, frame, table) {
   else if (pose === 'win') values = [19, -34, -68 + rhythm * 17, -7, 8, 6 + rhythm * 2, 0];
   else if (pose === 'jump') values = [35, -17, -23, 8, 18, 13, 0];
   else if (pose === 'walk') {
-    const stride = Math.sin(frame * 0.34);
+    const stride = Math.sin(2*Math.PI*gaitDistance/WALK_CYCLE);
     values = [
       rest[0] + stride * 7,
       6 + stride * 4,
@@ -208,8 +211,13 @@ export function motionAt(fighter, frame, table) {
     angle: (angle + bend) * rad,
     lean: lean * rad,
     step,
-    lift,
+    lift:lift-Math.sin((fighter.landingFrames ?? 0)*Math.PI/8)*6,
     shift,
+    gaitDistance,
+    gaitBlend: !move && !fighter.y && ['idle','guard','walk'].includes(pose) ? fighter.walkBlend ?? 0 : 0,
+    jumpTuck:unit((fighter.y ?? 0)/42),
+    advance:move?.startX === undefined ? 0 : ((fighter.x-move.startX)*fighter.facing)/MODEL_SCALE,
+    cue,
     bodyTilt: f[2] * rad * a,
     travel: f[0] * a,
     elevation: f[3] * a + dip,

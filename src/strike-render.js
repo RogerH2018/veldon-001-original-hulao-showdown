@@ -1,3 +1,4 @@
+import { language } from './locale.js?v=5';
 const tau = Math.PI * 2;
 const aspect = {
   dragon: '龍', tiger: '虎', flame: '火', wind: '風', moon: '月', sun: '日', petal: '花', bell: '音',
@@ -93,7 +94,8 @@ export function drawStrike(ctx, event, age) {
     ctx.fillStyle = '#762c21'; ctx.fillRect(-17,-17,34,34);
     ctx.strokeStyle = '#efca89'; ctx.lineWidth = 1; ctx.strokeRect(-15,-15,30,30);
     ctx.fillStyle = '#fff0bc'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.font='bold 26px KaiTi, STKaiti, serif'; ctx.fillText(aspect[family] ?? '武', 0, 1);
+    ctx.font=language==='en'?'bold 10px system-ui':'bold 26px KaiTi, STKaiti, serif';
+    ctx.fillText(language==='en' ? (family ?? 'strike').toUpperCase() : aspect[family] ?? '武', 0, 1, 30);
   }
   ctx.restore();
 }

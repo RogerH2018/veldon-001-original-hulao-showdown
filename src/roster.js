@@ -1,5 +1,5 @@
-import { COMPANIES } from './generals.js?v=4';
-import { CHOREOGRAPHY } from './choreography.js?v=4';
+import { COMPANIES } from './generals.js?v=5';
+import { CHOREOGRAPHY } from './choreography.js?v=5';
 
 const swatches = {
   jade: ['#287768', '#153f40'], ivory: ['#ded9bd', '#73868c'], steel: ['#96adbe', '#40546d'],

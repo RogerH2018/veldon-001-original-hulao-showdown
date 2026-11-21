@@ -1,6 +1,7 @@
-import { GROUND, HEIGHT, MOVES, WIDTH } from './fight.js?v=4';
-import { drawFighter } from './fighter-render.js?v=4';
-import { drawStrike } from './strike-render.js?v=4';
+import { language, t } from './locale.js?v=5';
+import { GROUND, HEIGHT, MOVES, WIDTH } from './fight.js?v=5';
+import { drawFighter } from './fighter-render.js?v=5';
+import { drawStrike } from './strike-render.js?v=5';
 
 const backdrop = new Image();
 backdrop.src = new URL('../assets/hulao.webp', import.meta.url).href;
@@ -48,8 +49,8 @@ export function createRenderer(canvas) {
       ctx.save(); ctx.translate(e.x, e.y);
       if (e.type === 'counter') {
         ctx.globalAlpha = Math.min(1, (1-age)*4); ctx.translate(0,-age*27);
-        ctx.textAlign = 'center'; ctx.font = 'bold 24px KaiTi, STKaiti, serif'; ctx.lineWidth = 4; ctx.strokeStyle = '#4d241c';
-        ctx.strokeText(e.text,0,0); ctx.fillStyle='#ffe4a1'; ctx.fillText(e.text,0,0);
+        ctx.textAlign = 'center'; ctx.font = language === 'en' ? 'bold 22px system-ui' : 'bold 24px KaiTi, STKaiti, serif'; ctx.lineWidth = 4; ctx.strokeStyle = '#4d241c';
+        ctx.strokeText(t(e.text),0,0); ctx.fillStyle='#ffe4a1'; ctx.fillText(t(e.text),0,0);
       } else {
         ctx.globalAlpha=(1-age)**1.5;
         const rays=e.last?13:8;

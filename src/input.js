@@ -1,3 +1,5 @@
+import { CONTROL_NAMES, actionName, t } from './locale.js?v=5';
+export { CONTROL_NAMES };
 // Stable port numbers also keep previously saved keyboard macros playable.
 export const PORT = { A: 0, B: 8, C: 1, D: 9, up: 4, down: 5, left: 6, right: 7 };
 export const ACTIONS = ['up', 'left', 'down', 'right', 'A', 'B', 'C', 'D'];
@@ -14,18 +16,12 @@ export const DEFAULT_BINDINGS = [
     D: 'Digit5',
   },
 ];
-export const CONTROL_NAMES = {
-  up: '上',
-  down: '下',
-  left: '左',
-  right: '右',
-  A: '快击',
-  B: '突进',
-  C: '重破',
-  D: '上挑',
-};
 export const EDITOR_ACTIONS = ['up', 'down', 'left', 'right', 'A', 'C', 'B', 'D'];
-const actionByName = new Map(Object.entries(CONTROL_NAMES).map(([id, name]) => [name, id]));
+const actionByName = new Map();
+for (const [id, name] of Object.entries(CONTROL_NAMES)) {
+  actionByName.set(name, id);
+  actionByName.set(actionName(id, 'en').toLowerCase(), id);
+}
 export const OLD_DEFAULTS = ['A W8 236A', '214B', '236D'];
 
 export const DEFAULT_MACROS = [
@@ -58,13 +54,13 @@ export function namedActions(sequence) {
     .trim()
     .split(/[\s,，、→]+/u)
     .filter(Boolean);
-  if (!words.length || !words.every((word) => actionByName.has(word))) return null;
-  return words.map((word) => actionByName.get(word));
+  const keys = words.map(word => actionByName.get(word.toLowerCase()));
+  return keys.length && keys.every(Boolean) ? keys : null;
 }
 
-export function describeCombo(sequence) {
+export function describeCombo(sequence, lang) {
   const named = namedActions(sequence);
-  if (named) return named.map((key) => CONTROL_NAMES[key]).join(' → ');
+  if (named) return named.map((key) => actionName(key, lang)).join(' → ');
   const dirs = ['', '下+后', '下', '下+前', '后', '回中', '前', '上+后', '上', '上+前'];
   const parts = [];
   for (const token of sequence
@@ -72,13 +68,13 @@ export function describeCombo(sequence) {
     .toUpperCase()
     .split(/[\s,，→]+/)) {
     if (/^W\d+$/.test(token)) {
-      parts.push('等待 ' + Number(token.slice(1)) + ' 帧');
+      parts.push(t('等待 {n} 帧',{n:Number(token.slice(1))},lang));
       continue;
     }
     const m = token.match(/^([1-9]*)([ABCD]+)$/);
     if (!m) return sequence;
-    const keys = [...m[1]].map((d) => dirs[Number(d)]);
-    const attacks = [...m[2]].map((key) => CONTROL_NAMES[key]).join('+');
+    const keys = [...m[1]].map((d) => t(dirs[Number(d)],{},lang));
+    const attacks = [...m[2]].map((key) => actionName(key, lang)).join('+');
     if (keys.length) keys[keys.length - 1] += '+' + attacks;
     else keys.push(attacks);
     parts.push(...keys);
@@ -92,8 +88,8 @@ export function compileCombo(sequence, facing, gap = 16) {
     .trim()
     .split(/[\s,，→]+/)
     .filter(Boolean);
-  if (tokens.length < 1 || tokens.length > 20) throw new Error('连招需要 1 至 20 段指令');
-  if (!Number.isInteger(gap) || gap < 6 || gap > 30) throw new Error('默认间隔须为 6 至 30 帧');
+  if (tokens.length < 1 || tokens.length > 20) throw new Error(t('连招需要 1 至 20 段指令'));
+  if (!Number.isInteger(gap) || gap < 6 || gap > 30) throw new Error(t('默认间隔须为 6 至 30 帧'));
   const named = namedActions(sequence);
   if (named)
     return named.flatMap((action) => [
@@ -111,12 +107,12 @@ export function compileCombo(sequence, facing, gap = 16) {
   for (const token of tokens) {
     if (/^W\d{1,2}$/.test(token)) {
       const frames = Number(token.slice(1));
-      if (frames < 1 || frames > 60) throw new Error('等待帧数必须在 1–60 之间');
+      if (frames < 1 || frames > 60) throw new Error(t('等待帧数必须在 1–60 之间'));
       result.push({ buttons: [], frames });
       continue;
     }
     const match = token.match(/^([1-9]{0,12})([ABCD]{1,4})$/);
-    if (!match) throw new Error('无法识别指令「' + token + '」，请用上下左右和四种招式编排');
+    if (!match) throw new Error(t('无法识别指令「{token}」，请用上下左右和四种招式编排',{token}));
     const [, motion, attack] = match;
     for (const digit of motion.slice(0, -1)) result.push({ buttons: toPorts(digit), frames: 3 });
     const buttons = [...new Set([...attack].map((action) => PORT[action]))];
@@ -150,7 +146,7 @@ export function keyName(code) {
     ShiftLeft: '左 Shift',
     ShiftRight: '右 Shift',
   };
-  return names[code] ?? code.replace(/^(Key|Digit)/, '');
+  return names[code] ? t(names[code]) : code.replace(/^(Key|Digit)/, '');
 }
 
 export class MacroPlayer {
